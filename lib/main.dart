@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flame/game.dart';
 
+import 'terrarium_game.dart';
+
 void main() {
-  runApp(const HisserApp());
+  runApp(const HissingoApp());
 }
 
 // Flutter UI
-class HisserApp extends StatelessWidget {
-  const HisserApp({super.key});
+class HissingoApp extends StatelessWidget {
+  const HissingoApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Hisser',
+      title: 'Hissingo',
       theme: ThemeData.dark(),
       home: const TerrariumScreen(),
     );
@@ -38,28 +40,14 @@ class _TerrariumScreenState extends State<TerrariumScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Flutter UI and Flame
+      // Bridges Flutter UI and Flame
       body: GameWidget(game: game),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // TODO: Add future functionality
+          // TODO: Implement UI interaction
         },
         child: const Icon(Icons.add),
       ),
     );
-  }
-}
-
-// Flame
-class TerrariumGame extends FlameGame {
-  @override
-  Future<void> onLoad() async {
-    // TODO: Create fixed-size world, responsive camera, and substrate
-  }
-
-  @override
-  void update(double dt) {
-    super.update(dt);
-    // Simulation state logic (Needs, Time, Environment) will run here
   }
 }
