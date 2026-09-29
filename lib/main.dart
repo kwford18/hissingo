@@ -3,6 +3,7 @@ import 'package:flame/game.dart';
 
 import 'terrarium_game.dart';
 import 'roach.dart';
+import 'environment.dart';
 
 void main() {
   runApp(const HissingoApp());
@@ -118,8 +119,7 @@ class _TerrariumScreenState extends State<TerrariumScreen> {
             ),
           ),
 
-          // Listens to the selectedRoach notifier and rebuilds only this UI panel
-          // when a roach is tapped rather than forcing the entire screen to rebuild
+          // Listens to the selectedRoach notifier and rebuilds the roach inspection UI panel
           ValueListenableBuilder<Roach?>(
             valueListenable: game.selectedRoach,
             builder: (context, selected, child) {
@@ -172,16 +172,24 @@ class _TerrariumScreenState extends State<TerrariumScreen> {
                           ),
                         ],
                       ),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: Text(
+                          'State: ${_formatActivity(selected.currentActivity)}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontStyle: FontStyle.italic,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 12),
-
                       // Display the 0-100 scale metrics for the active roach
                       _buildNeedRow('Happiness', selected.happiness),
                       _buildNeedRow('Hunger', selected.needs.hunger),
                       _buildNeedRow('Thirst', selected.needs.thirst),
                       _buildNeedRow('Fatigue', selected.needs.fatigue),
-
                       const SizedBox(height: 16),
-
                       // Clears the notifier value to hide the inspection panel
                       ElevatedButton(
                         onPressed: () => game.selectedRoach.value = null,
@@ -193,9 +201,126 @@ class _TerrariumScreenState extends State<TerrariumScreen> {
               );
             },
           ),
+
+          // Listens to the selectedHide notifier and rebuilds the hide inspection UI panel
+          ValueListenableBuilder<Hide?>(
+            valueListenable: game.selectedHide,
+            builder: (context, selected, child) {
+              if (selected == null) return const SizedBox.shrink();
+
+              final occupants = game.roaches
+                  .where((r) => r.isHidden && r.targetHide == selected)
+                  .toList();
+
+              return Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 24.0),
+                  padding: const EdgeInsets.all(16.0),
+                  width: 320,
+                  decoration: BoxDecoration(
+                    color: const Color(0xDD000000),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Hide Inspection',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Occupants: ${occupants.length}',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                      const SizedBox(height: 8),
+                      if (occupants.isEmpty)
+                        const Text(
+                          'Empty',
+                          style: TextStyle(color: Colors.white70),
+                        )
+                      else
+                        ...occupants.map(
+                          (r) => Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              TextButton(
+                                onPressed: () {
+                                  game.selectedHide.value = null;
+                                  game.selectedRoach.value = r;
+                                },
+                                child: Text(
+                                  r.name,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: () {
+                                  r.coaxOut();
+                                  // Force UI refresh to update the occupant count
+                                  final currentHide = game.selectedHide.value;
+                                  game.selectedHide.value = null;
+                                  game.selectedHide.value = currentHide;
+                                },
+                                icon: const Icon(Icons.output, size: 18),
+                                label: const Text('Coax out'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => game.selectedHide.value = null,
+                        child: const Text('Close'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
+  }
+
+  // Translates enum values into a clean readable format for the UI
+  String _formatActivity(Activity a) {
+    switch (a) {
+      case Activity.idle:
+        return 'Idle';
+      case Activity.wandering:
+        return 'Wandering';
+      case Activity.seekingFood:
+        return 'Seeking Food';
+      case Activity.eating:
+        return 'Eating';
+      case Activity.seekingWater:
+        return 'Seeking Water';
+      case Activity.drinking:
+        return 'Drinking';
+      case Activity.seekingHide:
+        return 'Seeking Hide';
+      case Activity.enteringHide:
+        return 'Entering Hide';
+      case Activity.hiding:
+        return 'Hiding';
+      case Activity.exitingHide:
+        return 'Exiting Hide';
+    }
   }
 
   void _showAdoptDialog(BuildContext context) {

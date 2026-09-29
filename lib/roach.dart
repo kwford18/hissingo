@@ -6,13 +6,25 @@ import 'package:flutter/material.dart';
 
 import 'environment.dart';
 
-// Configuration for the simulation, including time scale and activity multiplier
+// Configuration for the simulation
 class SimConfig {
   static double timeScale = 1.0;
   static double activityMultiplier = 5.0;
+  static const double dayLengthSeconds = 1800.0;
 }
 
-enum Activity { idle, wandering, seekingFood, eating, seekingWater, drinking }
+enum Activity {
+  idle,
+  wandering,
+  seekingFood,
+  eating,
+  seekingWater,
+  drinking,
+  seekingHide,
+  enteringHide,
+  hiding,
+  exitingHide,
+}
 
 // Personality traits for a roach. Affects behavior
 class Personality {
@@ -50,12 +62,17 @@ class Roach {
 
   Activity currentActivity = Activity.idle;
 
-  // Can store a Vector2 coordinate or a specific environmental object
   Object? currentTarget;
-  double stateTimer = 0;
+  Hide? targetHide;
+  Hide? favoriteHide;
+  bool isHidden = false;
 
+  double stateTimer = 0;
   final double speed = 30.0;
   final Random _random = Random();
+
+  late final Color bodyColor;
+  late final double scaleModifier;
 
   Roach({
     required this.id,
@@ -63,16 +80,57 @@ class Roach {
     required this.position,
     this.orientation = 0,
     this.personality = const Personality(),
-  });
+    Color? color,
+    double? scale,
+  }) {
+    if (scale != null) {
+      scaleModifier = scale;
+    } else {
+      // Generates a slight persistent variation in size
+      scaleModifier = 0.85 + _random.nextDouble() * 0.3;
+    }
+
+    if (color != null) {
+      bodyColor = color;
+    } else {
+      // Generates a persistent subtle color shift from the base hisser brown
+      final rOff = _random.nextInt(40) - 20;
+      final gOff = _random.nextInt(30) - 15;
+      final bOff = _random.nextInt(30) - 15;
+
+      final r = (141 + rOff).clamp(0, 255);
+      final g = (110 + gOff).clamp(0, 255);
+      final b = (99 + bOff).clamp(0, 255);
+
+      bodyColor = Color.fromARGB(255, r, g, b);
+    }
+  }
 
   double get happiness => 100.0 - needs.averageNeed;
 
+  // Prompts the roach to leave its current hide
+  // Does not lower happiness
+  void coaxOut() {
+    final h = targetHide;
+    if (isHidden && h is Hide) {
+      currentActivity = Activity.exitingHide;
+      currentTarget = h.getEntrance();
+      stateTimer = 10.0;
+    }
+  }
+
   void update(
-    double dt,
-    Rect boundaries,
-    List<Food> availableFoods,
-    List<WaterPellet> availableWater,
-  ) {
+    double dt, {
+    required Rect boundaries,
+    required List<Food> availableFoods,
+    required List<WaterPellet> availableWater,
+    required List<Hide> availableHides,
+    required bool isDayTime,
+  }) {
+    if (favoriteHide == null && availableHides.isNotEmpty) {
+      favoriteHide = availableHides[_random.nextInt(availableHides.length)];
+    }
+
     // Passively increase needs over time
     needs.hunger += dt * 0.5 * personality.appetite;
     needs.thirst += dt * 0.7 * personality.appetite;
@@ -86,14 +144,23 @@ class Roach {
 
     stateTimer -= dt;
     if (stateTimer <= 0) {
-      _decideNextActivity(boundaries, availableFoods, availableWater);
+      _decideNextActivity(
+        boundaries: boundaries,
+        availableFoods: availableFoods,
+        availableWater: availableWater,
+        availableHides: availableHides,
+        isDayTime: isDayTime,
+      );
     }
 
     final target = currentTarget;
     final isMoving =
         currentActivity == Activity.wandering ||
         currentActivity == Activity.seekingFood ||
-        currentActivity == Activity.seekingWater;
+        currentActivity == Activity.seekingWater ||
+        currentActivity == Activity.seekingHide ||
+        currentActivity == Activity.enteringHide ||
+        currentActivity == Activity.exitingHide;
 
     // Verify the object is present in memory to safely permit movement
     if (isMoving && target is Object) {
@@ -105,30 +172,22 @@ class Roach {
     final target = currentTarget;
 
     if (currentActivity == Activity.eating) {
-      if (target is Food) {
-        final consumeRate = dt * 15.0;
-        target.amount -= consumeRate;
-        needs.hunger -= consumeRate;
-
+      if (target is Food && target.isDepleted == false) {
+        needs.hunger -= dt * 30.0;
         if (needs.hunger < 0) needs.hunger = 0;
-        if (target.amount <= 0) {
-          currentActivity = Activity.idle;
-          currentTarget = null;
+        if (stateTimer <= 0.1) {
+          target.isDepleted = true;
         }
       } else {
         currentActivity = Activity.idle;
         currentTarget = null;
       }
     } else if (currentActivity == Activity.drinking) {
-      if (target is WaterPellet) {
-        final consumeRate = dt * 15.0;
-        target.amount -= consumeRate;
-        needs.thirst -= consumeRate;
-
+      if (target is WaterPellet && target.isDepleted == false) {
+        needs.thirst -= dt * 30.0;
         if (needs.thirst < 0) needs.thirst = 0;
-        if (target.amount <= 0) {
-          currentActivity = Activity.idle;
-          currentTarget = null;
+        if (stateTimer <= 0.1) {
+          target.isDepleted = true;
         }
       } else {
         currentActivity = Activity.idle;
@@ -137,40 +196,90 @@ class Roach {
     } else if (currentActivity == Activity.idle) {
       needs.fatigue -= dt * 2.0;
       if (needs.fatigue < 0) needs.fatigue = 0;
+    } else if (currentActivity == Activity.hiding) {
+      needs.fatigue -= dt * 4.0;
+      if (needs.fatigue < 0) needs.fatigue = 0;
     }
   }
 
-  // Decide the next activity based on personality and random factors
-  void _decideNextActivity(
-    Rect boundaries,
-    List<Food> availableFoods,
-    List<WaterPellet> availableWater,
-  ) {
-    if (needs.thirst > 40 && availableWater.isNotEmpty) {
-      currentActivity = Activity.seekingWater;
-      currentTarget = _findNearestWater(availableWater);
-      stateTimer = 30.0;
+  // Decides next activity based on needs, available resources, and personality traits
+  void _decideNextActivity({
+    required Rect boundaries,
+    required List<Food> availableFoods,
+    required List<WaterPellet> availableWater,
+    required List<Hide> availableHides,
+    required bool isDayTime,
+  }) {
+    final h = targetHide;
+
+    if (isHidden && h is Hide) {
+      if (needs.fatigue < 10 || needs.hunger > 60 || needs.thirst > 60) {
+        currentActivity = Activity.exitingHide;
+        currentTarget = h.getEntrance();
+        stateTimer = 10.0;
+      }
       return;
+    }
+
+    if (currentActivity == Activity.enteringHide ||
+        currentActivity == Activity.exitingHide) {
+      return;
+    }
+
+    if (needs.thirst > 40 && availableWater.isNotEmpty) {
+      final waterTarget = _findNearestWater(availableWater);
+      if (waterTarget is WaterPellet) {
+        currentActivity = Activity.seekingWater;
+        currentTarget = waterTarget;
+        stateTimer = 30.0;
+        return;
+      }
     }
 
     if (needs.hunger > 40 && availableFoods.isNotEmpty) {
-      currentActivity = Activity.seekingFood;
-      currentTarget = _findNearestFood(availableFoods);
-      stateTimer = 30.0;
-      return;
+      final foodTarget = _findNearestFood(availableFoods);
+      if (foodTarget is Food) {
+        currentActivity = Activity.seekingFood;
+        currentTarget = foodTarget;
+        stateTimer = 30.0;
+        return;
+      }
     }
 
-    final roll = _random.nextDouble();
-    final wanderThreshold =
-        0.3 * personality.activity * SimConfig.activityMultiplier;
+    double wanderWeight =
+        15.0 * personality.activity * SimConfig.activityMultiplier;
+    double hideWeight = 25.0 * (1.0 + personality.skittishness);
+    double idleWeight = 40.0;
 
-    if (roll < wanderThreshold) {
+    // Time of day heavily influences the weights for more natural feeling behavior
+    // Roaches are more likely to hide during the day and wander at night
+    if (isDayTime) {
+      hideWeight *= 2.5;
+      idleWeight *= 1.5;
+      wanderWeight *= 0.3;
+    } else {
+      wanderWeight *= 2.0;
+      hideWeight *= 0.5;
+    }
+
+    double totalWeight = wanderWeight + hideWeight + idleWeight;
+    double roll = _random.nextDouble() * totalWeight;
+
+    if (roll < wanderWeight) {
       currentActivity = Activity.wandering;
       stateTimer = 5.0 + _random.nextDouble() * 5.0;
 
       final targetX = boundaries.left + _random.nextDouble() * boundaries.width;
       final targetY = boundaries.top + _random.nextDouble() * boundaries.height;
       currentTarget = Vector2(targetX, targetY);
+    } else if (roll < wanderWeight + hideWeight && availableHides.isNotEmpty) {
+      currentActivity = Activity.seekingHide;
+      targetHide = _chooseHide(availableHides);
+      final currentTargetHide = targetHide;
+      if (currentTargetHide is Hide) {
+        currentTarget = currentTargetHide.getEntrance();
+      }
+      stateTimer = 30.0;
     } else {
       currentActivity = Activity.idle;
       stateTimer = 2.0 + _random.nextDouble() * 4.0;
@@ -178,11 +287,14 @@ class Roach {
     }
   }
 
-  Food _findNearestFood(List<Food> locations) {
-    Food nearest = locations.first;
+  Food? _findNearestFood(List<Food> locations) {
+    final validFoods = locations.where((f) => f.isDepleted == false).toList();
+    if (validFoods.isEmpty) return null;
+
+    Food nearest = validFoods.first;
     double minDistance = (nearest.position - position).length;
 
-    for (final loc in locations) {
+    for (final loc in validFoods) {
       final dist = (loc.position - position).length;
       if (dist < minDistance) {
         minDistance = dist;
@@ -192,8 +304,33 @@ class Roach {
     return nearest;
   }
 
-  WaterPellet _findNearestWater(List<WaterPellet> locations) {
-    WaterPellet nearest = locations.first;
+  WaterPellet? _findNearestWater(List<WaterPellet> locations) {
+    final validWater = locations.where((w) => w.isDepleted == false).toList();
+    if (validWater.isEmpty) return null;
+
+    WaterPellet nearest = validWater.first;
+    double minDistance = (nearest.position - position).length;
+
+    for (final loc in validWater) {
+      final dist = (loc.position - position).length;
+      if (dist < minDistance) {
+        minDistance = dist;
+        nearest = loc;
+      }
+    }
+    return nearest;
+  }
+
+  Hide _chooseHide(List<Hide> locations) {
+    final fav = favoriteHide;
+    if (fav is Hide && locations.contains(fav)) {
+      // Roaches strongly prefer to return to their personal favorite hide
+      if (_random.nextDouble() < 0.8) {
+        return fav;
+      }
+    }
+
+    Hide nearest = locations.first;
     double minDistance = (nearest.position - position).length;
 
     for (final loc in locations) {
@@ -218,6 +355,9 @@ class Roach {
       targetPos = target.position;
     } else if (target is WaterPellet) {
       targetPos = target.position;
+    } else if (target is Hide) {
+      // Targets the center of the hide when seeking it
+      targetPos = target.position + (target.size / 2);
     } else {
       return;
     }
@@ -225,13 +365,47 @@ class Roach {
     final direction = targetPos - position;
     final distance = direction.length;
 
-    if (distance < 5.0) {
+    bool reachedTarget = false;
+
+    if (currentActivity == Activity.seekingHide && target is Hide) {
+      final hideRect = Rect.fromLTWH(
+        target.position.x,
+        target.position.y,
+        target.size.x,
+        target.size.y,
+      );
+      if (hideRect.contains(Offset(position.x, position.y))) {
+        reachedTarget = true;
+      }
+    } else {
+      if (distance < 5.0) {
+        reachedTarget = true;
+      }
+    }
+
+    if (reachedTarget) {
       if (currentActivity == Activity.seekingFood) {
         currentActivity = Activity.eating;
-        stateTimer = 5.0;
+        stateTimer = 4.0;
       } else if (currentActivity == Activity.seekingWater) {
         currentActivity = Activity.drinking;
-        stateTimer = 5.0;
+        stateTimer = 4.0;
+      } else if (currentActivity == Activity.seekingHide) {
+        currentActivity = Activity.enteringHide;
+        final h = targetHide;
+        if (h is Hide) {
+          currentTarget = h.getRandomInterior(_random);
+        }
+        isHidden = true;
+      } else if (currentActivity == Activity.enteringHide) {
+        currentActivity = Activity.hiding;
+        currentTarget = null;
+        stateTimer = 30.0;
+      } else if (currentActivity == Activity.exitingHide) {
+        currentActivity = Activity.idle;
+        currentTarget = null;
+        isHidden = false;
+        targetHide = null;
       } else {
         currentActivity = Activity.idle;
         currentTarget = null;
@@ -263,11 +437,12 @@ class RoachComponent extends PositionComponent with TapCallbacks {
   RoachComponent(this.roach, {required this.onSelect}) {
     size = Vector2(40, 70);
     anchor = Anchor.center;
+    scale = Vector2(roach.scaleModifier, roach.scaleModifier);
 
     position = roach.position;
     angle = roach.orientation;
 
-    bodyPaint = Paint()..color = const Color(0xFF8D6E63);
+    bodyPaint = Paint()..color = roach.bodyColor;
     outlinePaint = Paint()
       ..color = const Color(0xFF3E2723)
       ..style = PaintingStyle.stroke
@@ -291,21 +466,56 @@ class RoachComponent extends PositionComponent with TapCallbacks {
     final isMoving =
         roach.currentActivity == Activity.wandering ||
         roach.currentActivity == Activity.seekingFood ||
-        roach.currentActivity == Activity.seekingWater;
+        roach.currentActivity == Activity.seekingWater ||
+        roach.currentActivity == Activity.seekingHide ||
+        roach.currentActivity == Activity.enteringHide ||
+        roach.currentActivity == Activity.exitingHide;
 
     final swing = isMoving
         ? sin(_animationTime * 15) * 4
         : sin(_animationTime * 2) * 1;
     final antennaWiggle = sin(_animationTime * 8) * 3;
 
-    // Adjusted horizontal reach so all six legs clearly peek out past the oval's widest point
-    _drawLeg(canvas, const Offset(12, 30), const Offset(2, 28), swing);
-    _drawLeg(canvas, const Offset(12, 45), const Offset(1, 45), -swing);
-    _drawLeg(canvas, const Offset(12, 60), const Offset(2, 62), swing);
+    // Draws the legs
+    // Each leg should barely peek out of the carrapace,
+    // with a slight swing to simulate movement
+    _drawLeg(
+      canvas,
+      start: const Offset(12, 30),
+      end: const Offset(2, 28),
+      swing: swing,
+    );
+    _drawLeg(
+      canvas,
+      start: const Offset(12, 45),
+      end: const Offset(1, 45),
+      swing: -swing,
+    );
+    _drawLeg(
+      canvas,
+      start: const Offset(12, 60),
+      end: const Offset(2, 62),
+      swing: swing,
+    );
 
-    _drawLeg(canvas, const Offset(28, 30), const Offset(38, 28), -swing);
-    _drawLeg(canvas, const Offset(28, 45), const Offset(39, 45), swing);
-    _drawLeg(canvas, const Offset(28, 60), const Offset(38, 62), -swing);
+    _drawLeg(
+      canvas,
+      start: const Offset(28, 30),
+      end: const Offset(38, 28),
+      swing: -swing,
+    );
+    _drawLeg(
+      canvas,
+      start: const Offset(28, 45),
+      end: const Offset(39, 45),
+      swing: swing,
+    );
+    _drawLeg(
+      canvas,
+      start: const Offset(28, 60),
+      end: const Offset(38, 62),
+      swing: -swing,
+    );
 
     final bodyRect = const Rect.fromLTWH(5, 20, 30, 50);
     canvas.drawOval(bodyRect, bodyPaint);
@@ -323,7 +533,12 @@ class RoachComponent extends PositionComponent with TapCallbacks {
     );
   }
 
-  void _drawLeg(Canvas canvas, Offset start, Offset end, double swing) {
+  void _drawLeg(
+    Canvas canvas, {
+    required Offset start,
+    required Offset end,
+    required double swing,
+  }) {
     final modifiedEnd = Offset(end.dx, end.dy + swing);
     canvas.drawLine(start, modifiedEnd, legPaint);
   }
@@ -334,5 +549,8 @@ class RoachComponent extends PositionComponent with TapCallbacks {
     position = roach.position;
     angle = roach.orientation;
     _animationTime += dt;
+
+    // Updates priority so roaches visually disappear underneath hides when sheltering
+    priority = roach.isHidden ? 10 : 100;
   }
 }

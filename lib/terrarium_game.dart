@@ -9,6 +9,33 @@ import 'package:flutter/material.dart';
 import 'roach.dart';
 import 'environment.dart';
 
+// Handles the visual changes associated with the day/night cycle
+class LightingOverlay extends PositionComponent {
+  final TerrariumGame game;
+  late final Paint nightPaint;
+
+  LightingOverlay(this.game) {
+    priority = 200;
+    nightPaint = Paint()..color = const Color(0x00000000);
+  }
+
+  @override
+  void update(double dt) {
+    final cycleProgress = game.dayCycleTimer / SimConfig.dayLengthSeconds;
+
+    // Sine wave for smooth darkness transition
+    final darkness = (0.5 - 0.5 * sin((cycleProgress + 0.25) * 2 * pi));
+    final alpha = (darkness * 160).toInt().clamp(0, 255);
+
+    nightPaint.color = Color.fromARGB(alpha, 0, 0, 15);
+  }
+
+  @override
+  void render(Canvas canvas) {
+    canvas.drawRect(game.boundaries, nightPaint);
+  }
+}
+
 // Main game class for the terrarium simulation
 class TerrariumGame extends FlameGame
     with PanDetector, ScaleDetector, ScrollDetector {
@@ -29,6 +56,7 @@ class TerrariumGame extends FlameGame
   late final CameraComponent cam;
 
   final ValueNotifier<Roach?> selectedRoach = ValueNotifier(null);
+  final ValueNotifier<Hide?> selectedHide = ValueNotifier(null);
 
   final List<Roach> roaches = [];
   final List<Hide> hides = [];
@@ -37,6 +65,9 @@ class TerrariumGame extends FlameGame
 
   final Random _random = Random();
 
+  double dayCycleTimer = 0.0;
+  bool get isDayTime => dayCycleTimer < (SimConfig.dayLengthSeconds / 2);
+
   // Methods
   @override
   Future<void> onLoad() async {
@@ -44,10 +75,12 @@ class TerrariumGame extends FlameGame
     add(terrariumWorld);
 
     boundaries = Rect.fromLTWH(0, 0, worldWidth, worldHeight);
-    terrariumWorld.add(Substrate(worldWidth, worldHeight));
+    terrariumWorld.add(Substrate(width: worldWidth, height: worldHeight));
 
     _spawnEnvironment();
     createDefaultTerrarium();
+
+    terrariumWorld.add(LightingOverlay(this));
 
     cam = CameraComponent(world: terrariumWorld);
     final bounds = Rectangle.fromLTWH(0, 0, worldWidth, worldHeight);
@@ -59,12 +92,44 @@ class TerrariumGame extends FlameGame
   }
 
   void _spawnEnvironment() {
-    final heatZone = WarmSpot(Vector2(1000, 1000), 800);
+    final heatZone = WarmSpot(position: Vector2(1000, 1000), radius: 800);
     terrariumWorld.add(heatZone);
 
-    final mainHide = Hide(Vector2(600, 600), Vector2(400, 150));
+    final mainHide = Hide(
+      position: Vector2(600, 600),
+      size: Vector2(400, 150),
+      shape: HideShape.log,
+      onSelect: (h) {
+        selectedHide.value = h;
+        selectedRoach.value = null;
+      },
+    );
     hides.add(mainHide);
     terrariumWorld.add(mainHide);
+
+    final stoneHide = Hide(
+      position: Vector2(200, 1200),
+      size: Vector2(250, 200),
+      shape: HideShape.stone,
+      onSelect: (h) {
+        selectedHide.value = h;
+        selectedRoach.value = null;
+      },
+    );
+    hides.add(stoneHide);
+    terrariumWorld.add(stoneHide);
+
+    final leafHide = Hide(
+      position: Vector2(1400, 400),
+      size: Vector2(300, 150),
+      shape: HideShape.leaf,
+      onSelect: (h) {
+        selectedHide.value = h;
+        selectedRoach.value = null;
+      },
+    );
+    hides.add(leafHide);
+    terrariumWorld.add(leafHide);
   }
 
   // Replaces the terrarium occupants with the predefined default squad
@@ -77,63 +142,86 @@ class TerrariumGame extends FlameGame
       c.removeFromParent();
     }
     selectedRoach.value = null;
+    selectedHide.value = null;
 
     _addPredefinedRoach(
-      'Ringo',
-      const Personality(
+      name: 'Ringo',
+      personality: const Personality(
         activity: 0.8,
-        appetite: 0.5,
-        friendliness: 0.5,
+        appetite: 0.7,
+        friendliness: 1.0,
         skittishness: 0.2,
       ),
-      Vector2(1000, 900),
+      position: Vector2(1000, 900),
+      color: const Color.fromARGB(255, 85, 36, 25),
+      scale: 0.7,
     );
     _addPredefinedRoach(
-      'Bingo',
-      const Personality(
+      name: 'Bingo',
+      personality: const Personality(
         activity: 0.5,
-        appetite: 0.8,
+        appetite: 0.4,
         friendliness: 0.5,
         skittishness: 0.5,
       ),
-      Vector2(1100, 900),
+      position: Vector2(1100, 900),
+      color: const Color.fromARGB(255, 141, 110, 99),
+      scale: 0.5,
     );
     _addPredefinedRoach(
-      'Singo',
-      const Personality(
+      name: 'Singo',
+      personality: const Personality(
         activity: 0.5,
-        appetite: 0.5,
+        appetite: 0.8,
         friendliness: 0.8,
         skittishness: 0.2,
       ),
-      Vector2(1000, 1100),
+      position: Vector2(1200, 1200),
+      color: const Color.fromARGB(255, 82, 14, 26),
+      scale: 1.05,
     );
     _addPredefinedRoach(
-      'Lingo',
-      const Personality(
-        activity: 0.2,
+      name: 'Lingo',
+      personality: const Personality(
+        activity: 0.3,
         appetite: 0.5,
-        friendliness: 0.2,
+        friendliness: 0.1,
         skittishness: 0.8,
       ),
-      Vector2(1100, 1100),
+      position: Vector2(1100, 1100),
+      color: const Color.fromARGB(255, 27, 10, 5),
+      scale: 0.65,
     );
   }
 
-  void _addPredefinedRoach(String name, Personality p, Vector2 pos) {
+  void _addPredefinedRoach({
+    required String name,
+    required Personality personality,
+    required Vector2 position,
+    required Color color,
+    required double scale,
+  }) {
     final newRoach = Roach(
       id: 'roach_${DateTime.now().millisecondsSinceEpoch}_$name',
       name: name,
-      position: pos,
-      personality: p,
+      position: position,
+      personality: personality,
+      color: color,
+      scale: scale,
     );
     roaches.add(newRoach);
     terrariumWorld.add(
-      RoachComponent(newRoach, onSelect: (r) => selectedRoach.value = r),
+      RoachComponent(
+        newRoach,
+        onSelect: (r) {
+          selectedRoach.value = r;
+          selectedHide.value = null;
+        },
+      ),
     );
   }
 
-  // Spawns a roach with a randomly generated personality
+  // Spawns a roach with a randomly generated personality and appearance
   void adoptRoach(String name) {
     final newRoach = Roach(
       id: 'roach_${DateTime.now().millisecondsSinceEpoch}',
@@ -148,7 +236,13 @@ class TerrariumGame extends FlameGame
     );
     roaches.add(newRoach);
     terrariumWorld.add(
-      RoachComponent(newRoach, onSelect: (r) => selectedRoach.value = r),
+      RoachComponent(
+        newRoach,
+        onSelect: (r) {
+          selectedRoach.value = r;
+          selectedHide.value = null;
+        },
+      ),
     );
   }
 
@@ -168,31 +262,49 @@ class TerrariumGame extends FlameGame
     }
   }
 
-  // Calculates the exact amount of hunger across the colony and dispenses that exact total
+  // Scatters food pieces equal to the population size plus a buffer
   void dispenseFood() {
-    final totalHunger = roaches.fold(0.0, (sum, r) => sum + r.needs.hunger);
     for (final f in foods) {
       f.removeFromParent();
     }
     foods.clear();
 
-    if (totalHunger > 0) {
-      final newFood = Food(Vector2(1200, 800), totalHunger);
+    final spawnCount = roaches.length + 4;
+    for (var i = 0; i < spawnCount; i++) {
+      final rx =
+          boundaries.left +
+          200 +
+          _random.nextDouble() * (boundaries.width - 400);
+      final ry =
+          boundaries.top +
+          200 +
+          _random.nextDouble() * (boundaries.height - 400);
+      final newFood = Food(Vector2(rx, ry));
+
       foods.add(newFood);
       terrariumWorld.add(newFood);
     }
   }
 
-  // Calculates the exact amount of thirst across the colony and dispenses that exact total
+  // Scatters water droplets equal to the population size plus a buffer
   void dispenseWater() {
-    final totalThirst = roaches.fold(0.0, (sum, r) => sum + r.needs.thirst);
     for (final w in waterPellets) {
       w.removeFromParent();
     }
     waterPellets.clear();
 
-    if (totalThirst > 0) {
-      final newWater = WaterPellet(Vector2(1300, 800), totalThirst);
+    final spawnCount = roaches.length + 4;
+    for (var i = 0; i < spawnCount; i++) {
+      final rx =
+          boundaries.left +
+          200 +
+          _random.nextDouble() * (boundaries.width - 400);
+      final ry =
+          boundaries.top +
+          200 +
+          _random.nextDouble() * (boundaries.height - 400);
+      final newWater = WaterPellet(Vector2(rx, ry));
+
       waterPellets.add(newWater);
       terrariumWorld.add(newWater);
     }
@@ -202,16 +314,27 @@ class TerrariumGame extends FlameGame
   @override
   void update(double dt) {
     super.update(dt);
-
     final scaledDt = dt * SimConfig.timeScale;
 
+    dayCycleTimer += scaledDt;
+    if (dayCycleTimer >= SimConfig.dayLengthSeconds) {
+      dayCycleTimer = 0.0;
+    }
+
     for (final roach in roaches) {
-      roach.update(scaledDt, boundaries, foods, waterPellets);
+      roach.update(
+        scaledDt,
+        boundaries: boundaries,
+        availableFoods: foods,
+        availableWater: waterPellets,
+        availableHides: hides,
+        isDayTime: isDayTime,
+      );
     }
 
     // Sweep the environment and remove fully consumed resources
     foods.removeWhere((f) {
-      if (f.amount <= 0) {
+      if (f.isDepleted) {
         f.removeFromParent();
         return true;
       }
@@ -219,7 +342,7 @@ class TerrariumGame extends FlameGame
     });
 
     waterPellets.removeWhere((w) {
-      if (w.amount <= 0) {
+      if (w.isDepleted) {
         w.removeFromParent();
         return true;
       }
@@ -264,8 +387,9 @@ class Substrate extends PositionComponent {
   late final Paint bgPaint;
   late final Paint borderPaint;
 
-  Substrate(this.width, this.height) {
+  Substrate({required this.width, required this.height}) {
     size = Vector2(width, height);
+    priority = 0;
 
     bgPaint = Paint()..color = const Color(0xFF5D4037);
     borderPaint = Paint()
