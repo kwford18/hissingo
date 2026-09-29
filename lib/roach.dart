@@ -24,9 +24,13 @@ enum Activity {
   enteringHide,
   hiding,
   exitingHide,
+  seekingEnrichment,
+  usingEnrichment,
+  seekingSocial,
+  interacting,
 }
 
-// Personality traits for a roach. Affects behavior
+// Personality traits for a roach
 class Personality {
   final double activity;
   final double appetite;
@@ -41,13 +45,14 @@ class Personality {
   });
 }
 
-// Needs of a roach. Affects happiness. Higher values are worse
+// Needs of a roach
 class Needs {
   double hunger = 0;
   double thirst = 0;
   double fatigue = 0;
+  double boredom = 50;
 
-  double get averageNeed => (hunger + thirst + fatigue) / 3;
+  double get averageNeed => (hunger + thirst + fatigue + boredom) / 4;
 }
 
 // Main roach class containing position, orientation, activity, and state
@@ -65,7 +70,11 @@ class Roach {
   Object? currentTarget;
   Hide? targetHide;
   Hide? favoriteHide;
+  Roach? targetRoach;
   bool isHidden = false;
+
+  String? currentEmotion;
+  double emotionTimer = 0;
 
   double stateTimer = 0;
   final double speed = 30.0;
@@ -125,6 +134,8 @@ class Roach {
     required List<Food> availableFoods,
     required List<WaterPellet> availableWater,
     required List<Hide> availableHides,
+    required List<ClimbingBranch> availableBranches,
+    required List<Roach> otherRoaches,
     required bool isDayTime,
   }) {
     if (favoriteHide == null && availableHides.isNotEmpty) {
@@ -135,12 +146,21 @@ class Roach {
     needs.hunger += dt * 0.5 * personality.appetite;
     needs.thirst += dt * 0.7 * personality.appetite;
     needs.fatigue += dt * 0.2;
+    needs.boredom += dt * 0.4;
 
     if (needs.hunger > 100) needs.hunger = 100;
     if (needs.thirst > 100) needs.thirst = 100;
     if (needs.fatigue > 100) needs.fatigue = 100;
+    if (needs.boredom > 100) needs.boredom = 100;
 
     _handleActiveStates(dt);
+
+    if (emotionTimer > 0) {
+      emotionTimer -= dt;
+      if (emotionTimer <= 0) {
+        currentEmotion = null;
+      }
+    }
 
     stateTimer -= dt;
     if (stateTimer <= 0) {
@@ -149,6 +169,8 @@ class Roach {
         availableFoods: availableFoods,
         availableWater: availableWater,
         availableHides: availableHides,
+        availableBranches: availableBranches,
+        otherRoaches: otherRoaches,
         isDayTime: isDayTime,
       );
     }
@@ -160,7 +182,9 @@ class Roach {
         currentActivity == Activity.seekingWater ||
         currentActivity == Activity.seekingHide ||
         currentActivity == Activity.enteringHide ||
-        currentActivity == Activity.exitingHide;
+        currentActivity == Activity.exitingHide ||
+        currentActivity == Activity.seekingEnrichment ||
+        currentActivity == Activity.seekingSocial;
 
     // Verify the object is present in memory to safely permit movement
     if (isMoving && target is Object) {
@@ -199,6 +223,18 @@ class Roach {
     } else if (currentActivity == Activity.hiding) {
       needs.fatigue -= dt * 4.0;
       if (needs.fatigue < 0) needs.fatigue = 0;
+    } else if (currentActivity == Activity.usingEnrichment) {
+      needs.boredom -= dt * 8.0;
+      needs.fatigue += dt * 3.0;
+      if (needs.boredom < 0) needs.boredom = 0;
+      if (needs.fatigue > 100) needs.fatigue = 100;
+    } else if (currentActivity == Activity.interacting) {
+      // The interaction outcome is processed immediately when they meet
+      // so this state just holds them still while the emotion timer counts down
+      if (stateTimer <= 0.1) {
+        currentActivity = Activity.idle;
+        currentTarget = null;
+      }
     }
   }
 
@@ -208,6 +244,8 @@ class Roach {
     required List<Food> availableFoods,
     required List<WaterPellet> availableWater,
     required List<Hide> availableHides,
+    required List<ClimbingBranch> availableBranches,
+    required List<Roach> otherRoaches,
     required bool isDayTime,
   }) {
     final h = targetHide;
@@ -250,6 +288,8 @@ class Roach {
         15.0 * personality.activity * SimConfig.activityMultiplier;
     double hideWeight = 25.0 * (1.0 + personality.skittishness);
     double idleWeight = 40.0;
+    double enrichmentWeight = needs.boredom * 0.5 * personality.activity;
+    double socialWeight = 15.0 * personality.friendliness;
 
     // Time of day heavily influences the weights for more natural feeling behavior
     // Roaches are more likely to hide during the day and wander at night
@@ -257,12 +297,21 @@ class Roach {
       hideWeight *= 2.5;
       idleWeight *= 1.5;
       wanderWeight *= 0.3;
+      enrichmentWeight *= 0.5;
+      socialWeight *= 0.5;
     } else {
       wanderWeight *= 2.0;
       hideWeight *= 0.5;
+      enrichmentWeight *= 1.5;
+      socialWeight *= 1.5;
     }
 
-    double totalWeight = wanderWeight + hideWeight + idleWeight;
+    double totalWeight =
+        wanderWeight +
+        hideWeight +
+        idleWeight +
+        enrichmentWeight +
+        socialWeight;
     double roll = _random.nextDouble() * totalWeight;
 
     if (roll < wanderWeight) {
@@ -279,6 +328,20 @@ class Roach {
       if (currentTargetHide is Hide) {
         currentTarget = currentTargetHide.getEntrance();
       }
+      stateTimer = 30.0;
+    } else if (roll < wanderWeight + hideWeight + enrichmentWeight &&
+        availableBranches.isNotEmpty) {
+      currentActivity = Activity.seekingEnrichment;
+      final branch =
+          availableBranches[_random.nextInt(availableBranches.length)];
+      currentTarget = branch.getRandomClimbSpot(_random);
+      stateTimer = 30.0;
+    } else if (roll <
+            wanderWeight + hideWeight + enrichmentWeight + socialWeight &&
+        otherRoaches.isNotEmpty) {
+      currentActivity = Activity.seekingSocial;
+      targetRoach = otherRoaches[_random.nextInt(otherRoaches.length)];
+      currentTarget = targetRoach;
       stateTimer = 30.0;
     } else {
       currentActivity = Activity.idle;
@@ -358,6 +421,8 @@ class Roach {
     } else if (target is Hide) {
       // Targets the center of the hide when seeking it
       targetPos = target.position + (target.size / 2);
+    } else if (target is Roach) {
+      targetPos = target.position;
     } else {
       return;
     }
@@ -375,6 +440,11 @@ class Roach {
         target.size.y,
       );
       if (hideRect.contains(Offset(position.x, position.y))) {
+        reachedTarget = true;
+      }
+    } else if (currentActivity == Activity.seekingSocial && target is Roach) {
+      // Interact when they get reasonably close to each other
+      if (distance < 40.0) {
         reachedTarget = true;
       }
     } else {
@@ -406,6 +476,27 @@ class Roach {
         currentTarget = null;
         isHidden = false;
         targetHide = null;
+      } else if (currentActivity == Activity.seekingEnrichment) {
+        currentActivity = Activity.usingEnrichment;
+        currentTarget = null;
+        stateTimer = 15.0 + _random.nextDouble() * 15.0;
+      } else if (currentActivity == Activity.seekingSocial) {
+        currentActivity = Activity.interacting;
+        stateTimer = 3.0;
+
+        // Determine the outcome of the social interaction based on friendliness
+        if (_random.nextDouble() < personality.friendliness) {
+          currentEmotion = ':)';
+          needs.boredom -= 20;
+          if (needs.boredom < 0) needs.boredom = 0;
+        } else {
+          currentEmotion = 'Hiss.';
+          needs.fatigue += 15;
+          if (needs.fatigue > 100) needs.fatigue = 100;
+        }
+        emotionTimer = 3.0;
+        currentTarget = null;
+        targetRoach = null;
       } else {
         currentActivity = Activity.idle;
         currentTarget = null;
@@ -431,6 +522,7 @@ class RoachComponent extends PositionComponent with TapCallbacks {
   late final Paint bodyPaint;
   late final Paint outlinePaint;
   late final Paint legPaint;
+  late final TextPaint emotionPaint;
 
   double _animationTime = 0;
 
@@ -454,6 +546,21 @@ class RoachComponent extends PositionComponent with TapCallbacks {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0
       ..strokeCap = StrokeCap.round;
+
+    emotionPaint = TextPaint(
+      style: const TextStyle(
+        fontSize: 24,
+        fontWeight: FontWeight.bold,
+        color: Colors.white,
+        shadows: [
+          Shadow(
+            blurRadius: 4.0,
+            color: Colors.black87,
+            offset: Offset(1.0, 1.0),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -469,7 +576,9 @@ class RoachComponent extends PositionComponent with TapCallbacks {
         roach.currentActivity == Activity.seekingWater ||
         roach.currentActivity == Activity.seekingHide ||
         roach.currentActivity == Activity.enteringHide ||
-        roach.currentActivity == Activity.exitingHide;
+        roach.currentActivity == Activity.exitingHide ||
+        roach.currentActivity == Activity.seekingEnrichment ||
+        roach.currentActivity == Activity.seekingSocial;
 
     final swing = isMoving
         ? sin(_animationTime * 15) * 4
@@ -477,7 +586,7 @@ class RoachComponent extends PositionComponent with TapCallbacks {
     final antennaWiggle = sin(_animationTime * 8) * 3;
 
     // Draws the legs
-    // Each leg should barely peek out of the carrapace,
+    // Each leg should barely peek out of the carrapace
     // with a slight swing to simulate movement
     _drawLeg(
       canvas,
@@ -531,6 +640,18 @@ class RoachComponent extends PositionComponent with TapCallbacks {
       Offset(35 + antennaWiggle, 5),
       outlinePaint,
     );
+
+    // Render the emotion indicator above the roach if active
+    final currentEmotionText = roach.currentEmotion;
+    if (roach.emotionTimer > 0 && currentEmotionText != null) {
+      // Rotates the canvas in reverse to ensure the text stays perfectly upright
+      // regardless of the direction the roach is facing
+      canvas.save();
+      canvas.translate(size.x / 2, size.y / 2);
+      canvas.rotate(-angle);
+      emotionPaint.render(canvas, currentEmotionText, Vector2(-15, -60));
+      canvas.restore();
+    }
   }
 
   void _drawLeg(

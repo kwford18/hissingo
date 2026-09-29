@@ -60,6 +60,7 @@ class TerrariumGame extends FlameGame
 
   final List<Roach> roaches = [];
   final List<Hide> hides = [];
+  final List<ClimbingBranch> branches = [];
   final List<Food> foods = [];
   final List<WaterPellet> waterPellets = [];
 
@@ -130,6 +131,20 @@ class TerrariumGame extends FlameGame
     );
     hides.add(leafHide);
     terrariumWorld.add(leafHide);
+
+    final largeBranch = ClimbingBranch(
+      position: Vector2(1200, 1400),
+      size: Vector2(500, 80),
+    );
+    branches.add(largeBranch);
+    terrariumWorld.add(largeBranch);
+
+    final smallBranch = ClimbingBranch(
+      position: Vector2(300, 300),
+      size: Vector2(80, 400),
+    );
+    branches.add(smallBranch);
+    terrariumWorld.add(smallBranch);
   }
 
   // Replaces the terrarium occupants with the predefined default squad
@@ -279,7 +294,7 @@ class TerrariumGame extends FlameGame
           boundaries.top +
           200 +
           _random.nextDouble() * (boundaries.height - 400);
-      final newFood = Food(Vector2(rx, ry));
+      final newFood = Food(position: Vector2(rx, ry));
 
       foods.add(newFood);
       terrariumWorld.add(newFood);
@@ -303,7 +318,7 @@ class TerrariumGame extends FlameGame
           boundaries.top +
           200 +
           _random.nextDouble() * (boundaries.height - 400);
-      final newWater = WaterPellet(Vector2(rx, ry));
+      final newWater = WaterPellet(position: Vector2(rx, ry));
 
       waterPellets.add(newWater);
       terrariumWorld.add(newWater);
@@ -322,12 +337,17 @@ class TerrariumGame extends FlameGame
     }
 
     for (final roach in roaches) {
+      // Create a list of all other roaches to pass to the interaction logic
+      final otherRoaches = roaches.where((r) => r != roach).toList();
+
       roach.update(
         scaledDt,
         boundaries: boundaries,
         availableFoods: foods,
         availableWater: waterPellets,
         availableHides: hides,
+        availableBranches: branches,
+        otherRoaches: otherRoaches,
         isDayTime: isDayTime,
       );
     }

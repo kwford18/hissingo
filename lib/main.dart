@@ -320,6 +320,14 @@ class _TerrariumScreenState extends State<TerrariumScreen> {
         return 'Hiding';
       case Activity.exitingHide:
         return 'Exiting Hide';
+      case Activity.seekingEnrichment:
+        return 'Seeking Enrichment';
+      case Activity.usingEnrichment:
+        return 'Using Enrichment';
+      case Activity.seekingSocial:
+        return 'Seeking Social Interaction';
+      case Activity.interacting:
+        return 'Interacting with another roach';
     }
   }
 
