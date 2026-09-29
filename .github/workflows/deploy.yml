@@ -23,8 +23,9 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      # Force CanvasKit and inject the correct base-href for GitHub Pages
       - name: Build Web
-        run: flutter build web --release --base-href /hisser/
+        run: flutter build web --release --web-renderer canvaskit --base-href /hissingo/
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
