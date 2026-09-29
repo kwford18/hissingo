@@ -83,8 +83,13 @@ class TerrariumGame extends FlameGame
     super.update(dt);
 
     final scaledDt = dt * SimConfig.timeScale;
+
+    // Extract positions to pass to the domain simulation
+    final foodPositions = foods.map((f) => f.position).toList();
+    final waterPositions = waterPellets.map((w) => w.position).toList();
+
     for (final roach in roaches) {
-      roach.update(scaledDt, boundaries);
+      roach.update(scaledDt, boundaries, foodPositions, waterPositions);
     }
   }
 
@@ -116,16 +121,21 @@ class TerrariumGame extends FlameGame
 }
 
 class Substrate extends PositionComponent {
+  @override
   final double width;
+
+  @override
   final double height;
+
   late final Paint bgPaint;
   late final Paint borderPaint;
 
   Substrate(this.width, this.height) {
     size = Vector2(width, height);
-    bgPaint = Paint()..color = const Color(0xFF3E2723);
+
+    bgPaint = Paint()..color = const Color(0xFF5D4037);
     borderPaint = Paint()
-      ..color = const Color(0xFF1B0000)
+      ..color = const Color(0xFF27150C)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 20;
   }
