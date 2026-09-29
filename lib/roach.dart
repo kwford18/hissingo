@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flame/components.dart';
+import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 
 // Configuration for the simulation, including time scale and activity multiplier
@@ -71,10 +72,11 @@ class Roach {
     // Passively increase needs over time
     needs.hunger += dt * 0.5 * personality.appetite;
     needs.thirst += dt * 0.7 * personality.appetite;
+    needs.fatigue += dt * 0.2;
 
-    // Clamp needs to a maximum of 100
     if (needs.hunger > 100) needs.hunger = 100;
     if (needs.thirst > 100) needs.thirst = 100;
+    if (needs.fatigue > 100) needs.fatigue = 100;
 
     _handleActiveStates(dt);
 
@@ -94,7 +96,6 @@ class Roach {
     }
   }
 
-  // Handle logic for stationary activities like eating and drinking
   void _handleActiveStates(double dt) {
     if (currentActivity == Activity.eating) {
       needs.hunger -= dt * 15.0;
@@ -102,6 +103,9 @@ class Roach {
     } else if (currentActivity == Activity.drinking) {
       needs.thirst -= dt * 15.0;
       if (needs.thirst < 0) needs.thirst = 0;
+    } else if (currentActivity == Activity.idle) {
+      needs.fatigue -= dt * 2.0;
+      if (needs.fatigue < 0) needs.fatigue = 0;
     }
   }
 
@@ -192,15 +196,17 @@ class Roach {
 }
 
 // Flame component representing a roach in the game world
-class RoachComponent extends PositionComponent {
+class RoachComponent extends PositionComponent with TapCallbacks {
   final Roach roach;
+  final void Function(Roach) onSelect;
+
   late final Paint bodyPaint;
   late final Paint outlinePaint;
   late final Paint legPaint;
 
   double _animationTime = 0;
 
-  RoachComponent(this.roach) {
+  RoachComponent(this.roach, {required this.onSelect}) {
     size = Vector2(40, 70);
     anchor = Anchor.center;
 
@@ -213,11 +219,17 @@ class RoachComponent extends PositionComponent {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5;
 
+    // Thinner stroke width to make the legs less visually dominant
     legPaint = Paint()
       ..color = const Color(0xFF3E2723)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
+      ..strokeWidth = 1.5
       ..strokeCap = StrokeCap.round;
+  }
+
+  @override
+  void onTapDown(TapDownEvent event) {
+    onSelect(roach);
   }
 
   @override
@@ -227,27 +239,35 @@ class RoachComponent extends PositionComponent {
         roach.currentActivity == Activity.seekingFood ||
         roach.currentActivity == Activity.seekingWater;
 
-    // Calculate leg swing based on movement or a slow twitch when idle
     final swing = isMoving
         ? sin(_animationTime * 15) * 5
         : sin(_animationTime * 2) * 1;
 
-    // Draw 3 legs on each side before drawing the body so they render underneath
-    _drawLeg(canvas, const Offset(10, 30), const Offset(-5, 25), swing);
-    _drawLeg(canvas, const Offset(10, 45), const Offset(-5, 45), -swing);
-    _drawLeg(canvas, const Offset(10, 60), const Offset(-5, 65), swing);
+    final antennaWiggle = sin(_animationTime * 8) * 3;
 
-    _drawLeg(canvas, const Offset(30, 30), const Offset(45, 25), -swing);
-    _drawLeg(canvas, const Offset(30, 45), const Offset(45, 45), swing);
-    _drawLeg(canvas, const Offset(30, 60), const Offset(45, 65), -swing);
+    // Shortened horizontal reach for the legs so they peek out just slightly
+    _drawLeg(canvas, const Offset(10, 30), const Offset(4, 28), swing);
+    _drawLeg(canvas, const Offset(10, 45), const Offset(3, 45), -swing);
+    _drawLeg(canvas, const Offset(10, 60), const Offset(4, 62), swing);
+
+    _drawLeg(canvas, const Offset(30, 30), const Offset(36, 28), -swing);
+    _drawLeg(canvas, const Offset(30, 45), const Offset(37, 45), swing);
+    _drawLeg(canvas, const Offset(30, 60), const Offset(36, 62), -swing);
 
     final bodyRect = const Rect.fromLTWH(5, 20, 30, 50);
     canvas.drawOval(bodyRect, bodyPaint);
     canvas.drawOval(bodyRect, outlinePaint);
 
-    // Antennae twitch slightly along with the legs
-    canvas.drawLine(const Offset(15, 20), Offset(5 + swing, 5), outlinePaint);
-    canvas.drawLine(const Offset(25, 20), Offset(35 + swing, 5), outlinePaint);
+    canvas.drawLine(
+      const Offset(15, 20),
+      Offset(5 + antennaWiggle, 5),
+      outlinePaint,
+    );
+    canvas.drawLine(
+      const Offset(25, 20),
+      Offset(35 + antennaWiggle, 5),
+      outlinePaint,
+    );
   }
 
   void _drawLeg(Canvas canvas, Offset start, Offset end, double swing) {

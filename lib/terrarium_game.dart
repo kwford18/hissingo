@@ -26,6 +26,8 @@ class TerrariumGame extends FlameGame
   late final World terrariumWorld;
   late final CameraComponent cam;
 
+  final ValueNotifier<Roach?> selectedRoach = ValueNotifier(null);
+
   final List<Roach> roaches = [];
   final List<Hide> hides = [];
   final List<Food> foods = [];
@@ -53,7 +55,10 @@ class TerrariumGame extends FlameGame
   }
 
   void _spawnEnvironment() {
-    final mainHide = Hide(Vector2(600, 600), Vector2(400, 300));
+    final heatZone = WarmSpot(Vector2(1000, 1000), 800);
+    terrariumWorld.add(heatZone);
+
+    final mainHide = Hide(Vector2(600, 600), Vector2(400, 150));
     hides.add(mainHide);
     terrariumWorld.add(mainHide);
 
@@ -74,7 +79,9 @@ class TerrariumGame extends FlameGame
     );
 
     roaches.add(testRoach);
-    terrariumWorld.add(RoachComponent(testRoach));
+    terrariumWorld.add(
+      RoachComponent(testRoach, onSelect: (r) => selectedRoach.value = r),
+    );
   }
 
   // Simulation
@@ -84,7 +91,6 @@ class TerrariumGame extends FlameGame
 
     final scaledDt = dt * SimConfig.timeScale;
 
-    // Extract positions to pass to the domain simulation
     final foodPositions = foods.map((f) => f.position).toList();
     final waterPositions = waterPellets.map((w) => w.position).toList();
 
