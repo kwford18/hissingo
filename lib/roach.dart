@@ -69,7 +69,8 @@ class Roach {
       _decideNextActivity(boundaries);
     }
 
-    if (currentActivity == Activity.wandering && targetPosition != null) {
+    final currentTarget = targetPosition;
+    if (currentActivity == Activity.wandering && currentTarget is Vector2) {
       _moveTowardsTarget(dt);
     }
   }
@@ -97,7 +98,10 @@ class Roach {
 
   // Move the roach towards its target position
   void _moveTowardsTarget(double dt) {
-    final direction = targetPosition! - position;
+    final target = targetPosition;
+    if (target == null) return;
+
+    final direction = target - position;
     final distance = direction.length;
 
     if (distance < 5.0) {

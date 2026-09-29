@@ -42,12 +42,6 @@ class _TerrariumScreenState extends State<TerrariumScreen> {
     return Scaffold(
       // Bridges Flutter UI and Flame
       body: GameWidget(game: game),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Implement UI interaction
-        },
-        child: const Icon(Icons.add),
-      ),
     );
   }
 }

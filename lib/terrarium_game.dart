@@ -5,6 +5,7 @@ import 'package:flame/experimental.dart';
 import 'package:flutter/material.dart';
 
 import 'roach.dart';
+import 'environment.dart';
 
 // Main game class for the terrarium simulation
 class TerrariumGame extends FlameGame
@@ -26,6 +27,9 @@ class TerrariumGame extends FlameGame
   late final CameraComponent cam;
 
   final List<Roach> roaches = [];
+  final List<Hide> hides = [];
+  final List<Food> foods = [];
+  final List<WaterPellet> waterPellets = [];
 
   // Methods
   @override
@@ -36,6 +40,7 @@ class TerrariumGame extends FlameGame
     boundaries = Rect.fromLTWH(0, 0, worldWidth, worldHeight);
     terrariumWorld.add(Substrate(worldWidth, worldHeight));
 
+    _spawnEnvironment();
     _spawnInitialRoaches();
 
     cam = CameraComponent(world: terrariumWorld);
@@ -45,6 +50,20 @@ class TerrariumGame extends FlameGame
     cam.viewfinder.zoom = 1.0;
     cam.viewfinder.position = Vector2(worldWidth / 2, worldHeight / 2);
     add(cam);
+  }
+
+  void _spawnEnvironment() {
+    final mainHide = Hide(Vector2(600, 600), Vector2(400, 300));
+    hides.add(mainHide);
+    terrariumWorld.add(mainHide);
+
+    final testFood = Food(Vector2(1200, 800));
+    foods.add(testFood);
+    terrariumWorld.add(testFood);
+
+    final testWater = WaterPellet(Vector2(1300, 800));
+    waterPellets.add(testWater);
+    terrariumWorld.add(testWater);
   }
 
   void _spawnInitialRoaches() {
