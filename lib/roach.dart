@@ -4,6 +4,8 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 
+import 'environment.dart';
+
 // Configuration for the simulation, including time scale and activity multiplier
 class SimConfig {
   static double timeScale = 1.0;
@@ -47,7 +49,9 @@ class Roach {
   double orientation;
 
   Activity currentActivity = Activity.idle;
-  Vector2? targetPosition;
+
+  // Can store a Vector2 coordinate or a specific environmental object
+  Object? currentTarget;
   double stateTimer = 0;
 
   final double speed = 30.0;
@@ -66,8 +70,8 @@ class Roach {
   void update(
     double dt,
     Rect boundaries,
-    List<Vector2> foodPositions,
-    List<Vector2> waterPositions,
+    List<Food> availableFoods,
+    List<WaterPellet> availableWater,
   ) {
     // Passively increase needs over time
     needs.hunger += dt * 0.5 * personality.appetite;
@@ -82,27 +86,54 @@ class Roach {
 
     stateTimer -= dt;
     if (stateTimer <= 0) {
-      _decideNextActivity(boundaries, foodPositions, waterPositions);
+      _decideNextActivity(boundaries, availableFoods, availableWater);
     }
 
-    final currentTarget = targetPosition;
+    final target = currentTarget;
     final isMoving =
         currentActivity == Activity.wandering ||
         currentActivity == Activity.seekingFood ||
         currentActivity == Activity.seekingWater;
 
-    if (isMoving && currentTarget is Vector2) {
+    // Verify the object is present in memory to safely permit movement
+    if (isMoving && target is Object) {
       _moveTowardsTarget(dt);
     }
   }
 
   void _handleActiveStates(double dt) {
+    final target = currentTarget;
+
     if (currentActivity == Activity.eating) {
-      needs.hunger -= dt * 15.0;
-      if (needs.hunger < 0) needs.hunger = 0;
+      if (target is Food) {
+        final consumeRate = dt * 15.0;
+        target.amount -= consumeRate;
+        needs.hunger -= consumeRate;
+
+        if (needs.hunger < 0) needs.hunger = 0;
+        if (target.amount <= 0) {
+          currentActivity = Activity.idle;
+          currentTarget = null;
+        }
+      } else {
+        currentActivity = Activity.idle;
+        currentTarget = null;
+      }
     } else if (currentActivity == Activity.drinking) {
-      needs.thirst -= dt * 15.0;
-      if (needs.thirst < 0) needs.thirst = 0;
+      if (target is WaterPellet) {
+        final consumeRate = dt * 15.0;
+        target.amount -= consumeRate;
+        needs.thirst -= consumeRate;
+
+        if (needs.thirst < 0) needs.thirst = 0;
+        if (target.amount <= 0) {
+          currentActivity = Activity.idle;
+          currentTarget = null;
+        }
+      } else {
+        currentActivity = Activity.idle;
+        currentTarget = null;
+      }
     } else if (currentActivity == Activity.idle) {
       needs.fatigue -= dt * 2.0;
       if (needs.fatigue < 0) needs.fatigue = 0;
@@ -112,20 +143,19 @@ class Roach {
   // Decide the next activity based on personality and random factors
   void _decideNextActivity(
     Rect boundaries,
-    List<Vector2> foodPositions,
-    List<Vector2> waterPositions,
+    List<Food> availableFoods,
+    List<WaterPellet> availableWater,
   ) {
-    // Urgent needs override random wandering
-    if (needs.thirst > 40 && waterPositions.isNotEmpty) {
+    if (needs.thirst > 40 && availableWater.isNotEmpty) {
       currentActivity = Activity.seekingWater;
-      targetPosition = _findNearest(waterPositions);
+      currentTarget = _findNearestWater(availableWater);
       stateTimer = 30.0;
       return;
     }
 
-    if (needs.hunger > 40 && foodPositions.isNotEmpty) {
+    if (needs.hunger > 40 && availableFoods.isNotEmpty) {
       currentActivity = Activity.seekingFood;
-      targetPosition = _findNearest(foodPositions);
+      currentTarget = _findNearestFood(availableFoods);
       stateTimer = 30.0;
       return;
     }
@@ -140,20 +170,34 @@ class Roach {
 
       final targetX = boundaries.left + _random.nextDouble() * boundaries.width;
       final targetY = boundaries.top + _random.nextDouble() * boundaries.height;
-      targetPosition = Vector2(targetX, targetY);
+      currentTarget = Vector2(targetX, targetY);
     } else {
       currentActivity = Activity.idle;
       stateTimer = 2.0 + _random.nextDouble() * 4.0;
-      targetPosition = null;
+      currentTarget = null;
     }
   }
 
-  Vector2 _findNearest(List<Vector2> locations) {
-    Vector2 nearest = locations.first;
-    double minDistance = (nearest - position).length;
+  Food _findNearestFood(List<Food> locations) {
+    Food nearest = locations.first;
+    double minDistance = (nearest.position - position).length;
 
     for (final loc in locations) {
-      final dist = (loc - position).length;
+      final dist = (loc.position - position).length;
+      if (dist < minDistance) {
+        minDistance = dist;
+        nearest = loc;
+      }
+    }
+    return nearest;
+  }
+
+  WaterPellet _findNearestWater(List<WaterPellet> locations) {
+    WaterPellet nearest = locations.first;
+    double minDistance = (nearest.position - position).length;
+
+    for (final loc in locations) {
+      final dist = (loc.position - position).length;
       if (dist < minDistance) {
         minDistance = dist;
         nearest = loc;
@@ -164,10 +208,21 @@ class Roach {
 
   // Move the roach towards its target position
   void _moveTowardsTarget(double dt) {
-    final target = targetPosition;
+    final target = currentTarget;
     if (target == null) return;
 
-    final direction = target - position;
+    Vector2 targetPos;
+    if (target is Vector2) {
+      targetPos = target;
+    } else if (target is Food) {
+      targetPos = target.position;
+    } else if (target is WaterPellet) {
+      targetPos = target.position;
+    } else {
+      return;
+    }
+
+    final direction = targetPos - position;
     final distance = direction.length;
 
     if (distance < 5.0) {
@@ -179,9 +234,8 @@ class Roach {
         stateTimer = 5.0;
       } else {
         currentActivity = Activity.idle;
+        currentTarget = null;
       }
-
-      targetPosition = null;
       return;
     }
 
@@ -223,7 +277,7 @@ class RoachComponent extends PositionComponent with TapCallbacks {
     legPaint = Paint()
       ..color = const Color(0xFF3E2723)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
+      ..strokeWidth = 1.0
       ..strokeCap = StrokeCap.round;
   }
 
@@ -240,19 +294,18 @@ class RoachComponent extends PositionComponent with TapCallbacks {
         roach.currentActivity == Activity.seekingWater;
 
     final swing = isMoving
-        ? sin(_animationTime * 15) * 5
+        ? sin(_animationTime * 15) * 4
         : sin(_animationTime * 2) * 1;
-
     final antennaWiggle = sin(_animationTime * 8) * 3;
 
-    // Shortened horizontal reach for the legs so they peek out just slightly
-    _drawLeg(canvas, const Offset(10, 30), const Offset(4, 28), swing);
-    _drawLeg(canvas, const Offset(10, 45), const Offset(3, 45), -swing);
-    _drawLeg(canvas, const Offset(10, 60), const Offset(4, 62), swing);
+    // Adjusted horizontal reach so all six legs clearly peek out past the oval's widest point
+    _drawLeg(canvas, const Offset(12, 30), const Offset(2, 28), swing);
+    _drawLeg(canvas, const Offset(12, 45), const Offset(1, 45), -swing);
+    _drawLeg(canvas, const Offset(12, 60), const Offset(2, 62), swing);
 
-    _drawLeg(canvas, const Offset(30, 30), const Offset(36, 28), -swing);
-    _drawLeg(canvas, const Offset(30, 45), const Offset(37, 45), swing);
-    _drawLeg(canvas, const Offset(30, 60), const Offset(36, 62), -swing);
+    _drawLeg(canvas, const Offset(28, 30), const Offset(38, 28), -swing);
+    _drawLeg(canvas, const Offset(28, 45), const Offset(39, 45), swing);
+    _drawLeg(canvas, const Offset(28, 60), const Offset(38, 62), -swing);
 
     final bodyRect = const Rect.fromLTWH(5, 20, 30, 50);
     canvas.drawOval(bodyRect, bodyPaint);

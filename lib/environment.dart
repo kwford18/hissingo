@@ -64,11 +64,12 @@ class WarmSpot extends PositionComponent {
   }
 }
 
-// A piece of food for the roaches
+// A piece of food with exact amount of food needed
 class Food extends PositionComponent {
+  double amount;
   late final Paint foodPaint;
 
-  Food(Vector2 pos) {
+  Food(Vector2 pos, this.amount) {
     position = pos;
     size = Vector2(15, 15);
     anchor = Anchor.center;
@@ -82,11 +83,12 @@ class Food extends PositionComponent {
   }
 }
 
-// A source of hydration
+// A source of hydration with exact amount of water needed
 class WaterPellet extends PositionComponent {
+  double amount;
   late final Paint waterPaint;
 
-  WaterPellet(Vector2 pos) {
+  WaterPellet(Vector2 pos, this.amount) {
     position = pos;
     size = Vector2(12, 12);
     anchor = Anchor.center;

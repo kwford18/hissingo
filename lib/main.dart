@@ -41,11 +41,82 @@ class _TerrariumScreenState extends State<TerrariumScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: Drawer(
+        child: ListView(
+          children: [
+            const DrawerHeader(
+              decoration: BoxDecoration(color: Color(0xFF3E2723)),
+              child: Text(
+                'Terrarium Menu',
+                style: TextStyle(fontSize: 24, color: Colors.white),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.group_add),
+              title: const Text('Create Default Terrarium'),
+              onTap: () {
+                Navigator.pop(context);
+                _showDefaultTerrariumConfirmDialog1(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.add_circle),
+              title: const Text('Adopt Roach'),
+              onTap: () {
+                Navigator.pop(context);
+                _showAdoptDialog(context);
+              },
+            ),
+          ],
+        ),
+      ),
       // Bridges Flutter UI and Flame
       body: Stack(
         children: [
           // The Flame game layer runs underneath the Flutter UI
           GameWidget(game: game),
+
+          // Menu button
+          Positioned(
+            top: 16,
+            left: 16,
+            child: Builder(
+              builder: (ctx) => IconButton(
+                icon: const Icon(Icons.menu, size: 32),
+                onPressed: () => Scaffold.of(ctx).openDrawer(),
+              ),
+            ),
+          ),
+
+          // Resource dispensing buttons
+          Positioned(
+            top: 16,
+            right: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () => game.dispenseFood(),
+                  icon: const Icon(Icons.restaurant),
+                  label: const Text('Food'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF689F38),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton.icon(
+                  onPressed: () => game.dispenseWater(),
+                  icon: const Icon(Icons.water_drop),
+                  label: const Text('Water'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4FC3F7),
+                    foregroundColor: Colors.black,
+                  ),
+                ),
+              ],
+            ),
+          ),
 
           // Listens to the selectedRoach notifier and rebuilds only this UI panel
           // when a roach is tapped rather than forcing the entire screen to rebuild
@@ -60,7 +131,7 @@ class _TerrariumScreenState extends State<TerrariumScreen> {
                 child: Container(
                   margin: const EdgeInsets.only(bottom: 24.0),
                   padding: const EdgeInsets.all(16.0),
-                  width: 300,
+                  width: 320,
                   decoration: BoxDecoration(
                     color: const Color(0xDD000000),
                     borderRadius: BorderRadius.circular(16),
@@ -69,12 +140,37 @@ class _TerrariumScreenState extends State<TerrariumScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        selected.name,
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            selected.name,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit, size: 20),
+                                onPressed: () =>
+                                    _showRenameDialog(context, selected),
+                                tooltip: 'Rename',
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.home,
+                                  size: 20,
+                                  color: Colors.redAccent,
+                                ),
+                                onPressed: () =>
+                                    _showRehomeConfirmDialog(context, selected),
+                                tooltip: 'Rehome',
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
 
@@ -96,6 +192,154 @@ class _TerrariumScreenState extends State<TerrariumScreen> {
                 ),
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAdoptDialog(BuildContext context) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Adopt Roach'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: 'Enter name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                game.adoptRoach(name);
+              } else {
+                game.adoptRoach('New Roach');
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('Adopt'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRenameDialog(BuildContext context, Roach roach) {
+    final controller = TextEditingController(text: roach.name);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rename Roach'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: 'Enter new name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                roach.name = name;
+
+                // Force a rebuild of the inspection panel by resetting the listener
+                final current = game.selectedRoach.value;
+                game.selectedRoach.value = null;
+                game.selectedRoach.value = current;
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRehomeConfirmDialog(BuildContext context, Roach roach) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rehome Roach'),
+        content: Text(
+          'Are you sure you want to rehome ${roach.name}? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              game.rehomeRoach(roach);
+              Navigator.pop(ctx);
+            },
+            child: const Text(
+              'Rehome',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDefaultTerrariumConfirmDialog1(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx1) => AlertDialog(
+        title: const Text('Reset Terrarium'),
+        content: const Text(
+          'This will remove all current roaches and replace them with the default colony. Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx1),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx1);
+              _showDefaultTerrariumConfirmDialog2(context);
+            },
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDefaultTerrariumConfirmDialog2(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx2) => AlertDialog(
+        title: const Text('Final Confirmation'),
+        content: const Text(
+          'Are you absolutely sure? All current roaches will be permanently removed.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx2),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              game.createDefaultTerrarium();
+              Navigator.pop(ctx2);
+            },
+            child: const Text(
+              'Create Default',
+              style: TextStyle(color: Colors.redAccent),
+            ),
           ),
         ],
       ),
