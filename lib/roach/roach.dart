@@ -260,6 +260,7 @@ class Roach {
         idleWeight +
         enrichmentWeight +
         socialWeight;
+
     double roll = _random.nextDouble() * totalWeight;
 
     if (roll < wanderWeight) {
@@ -452,8 +453,13 @@ class Roach {
       return;
     }
 
+    double currentSpeed = speed;
+    if (currentActivity == Activity.seekingSocial) {
+      currentSpeed *= SimConfig.socialSpeedMultiplier;
+    }
+
     direction.normalize();
-    position += direction * speed * dt;
+    position += direction * currentSpeed * dt;
 
     final targetAngle = atan2(direction.y, direction.x) + (pi / 2);
     final angleDiff = (targetAngle - orientation + pi) % (2 * pi) - pi;
