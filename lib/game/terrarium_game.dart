@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:async';
 
 import 'package:flame/game.dart';
 import 'package:flame/components.dart';
@@ -7,11 +8,13 @@ import 'package:flame/experimental.dart';
 import 'package:flutter/material.dart';
 
 import '../config/sim_config.dart';
-import '../environment/climbing_branch.dart';
-import '../environment/food.dart';
+import '../environment/enrichment.dart';
+import '../environment/food_dish.dart';
+import '../environment/gift_item.dart';
 import '../environment/hide.dart';
 import '../environment/warm_spot.dart';
-import '../environment/water_pellet.dart';
+import '../environment/water_dish.dart';
+import '../roach/activity.dart';
 import '../roach/personality.dart';
 import '../roach/roach.dart';
 import '../roach/roach_component.dart';
@@ -39,17 +42,21 @@ class TerrariumGame extends FlameGame
 
   final ValueNotifier<Roach?> selectedRoach = ValueNotifier(null);
   final ValueNotifier<Hide?> selectedHide = ValueNotifier(null);
+  final ValueNotifier<int> collectedGifts = ValueNotifier(0);
 
   final List<Roach> roaches = [];
   final List<Hide> hides = [];
-  final List<ClimbingBranch> branches = [];
-  final List<Food> foods = [];
-  final List<WaterPellet> waterPellets = [];
+  final List<EnrichmentObject> enrichments = [];
+
+  late final FoodDish foodDish;
+  late final WaterDish waterDish;
 
   final Random _random = Random();
 
   double dayCycleTimer = 0.0;
   bool get isDayTime => dayCycleTimer < (SimConfig.dayLengthSeconds / 2);
+
+  double _giftCheckTimer = 60.0;
 
   // Methods
   @override
@@ -63,7 +70,7 @@ class TerrariumGame extends FlameGame
     _spawnEnvironment();
     createDefaultTerrarium();
 
-    terrariumWorld.add(LightingOverlay(this));
+    terrariumWorld.add(LightingOverlay(game: this));
 
     cam = CameraComponent(world: terrariumWorld);
     final bounds = Rectangle.fromLTWH(0, 0, worldWidth, worldHeight);
@@ -88,6 +95,16 @@ class TerrariumGame extends FlameGame
   void _spawnEnvironment() {
     final heatZone = WarmSpot(position: Vector2(1000, 1000), radius: 800);
     terrariumWorld.add(heatZone);
+
+    final skull = PirateSkull(position: Vector2(1000, 850));
+    enrichments.add(skull);
+    terrariumWorld.add(skull);
+
+    foodDish = FoodDish(position: Vector2(950, 950));
+    terrariumWorld.add(foodDish);
+
+    waterDish = WaterDish(position: Vector2(1050, 950));
+    terrariumWorld.add(waterDish);
 
     final mainHide = Hide(
       position: Vector2(600, 600),
@@ -116,19 +133,24 @@ class TerrariumGame extends FlameGame
     hides.add(leafHide);
     terrariumWorld.add(leafHide);
 
-    final largeBranch = ClimbingBranch(
-      position: Vector2(1200, 1400),
+    final branch = ClimbingBranch(
+      position: Vector2(1300, 800),
       size: Vector2(500, 80),
     );
-    branches.add(largeBranch);
-    terrariumWorld.add(largeBranch);
+    enrichments.add(branch);
+    terrariumWorld.add(branch);
 
-    final smallBranch = ClimbingBranch(
-      position: Vector2(300, 300),
-      size: Vector2(80, 400),
-    );
-    branches.add(smallBranch);
-    terrariumWorld.add(smallBranch);
+    final slots = SlotMachine(position: Vector2(400, 300));
+    enrichments.add(slots);
+    terrariumWorld.add(slots);
+
+    final gym = WorkoutArea(position: Vector2(800, 1100));
+    enrichments.add(gym);
+    terrariumWorld.add(gym);
+
+    final book = Book(position: Vector2(1200, 1100));
+    enrichments.add(book);
+    terrariumWorld.add(book);
   }
 
   // Replaces the terrarium occupants with the predefined default squad
@@ -271,45 +293,27 @@ class TerrariumGame extends FlameGame
     selectedHide.value = currentHide;
   }
 
-  // Scatters food pieces equal to the population size plus a buffer
-  void dispenseFood() {
-    for (final f in foods) {
-      f.removeFromParent();
-    }
-    foods.clear();
-
-    final spawnCount = roaches.length + 4;
-    for (var i = 0; i < spawnCount; i++) {
-      final newFood = Food(position: _randomSpawnPosition());
-
-      foods.add(newFood);
-      terrariumWorld.add(newFood);
+  // Summons roaches out of hides and towards the center dishes
+  void dispenseTreat() {
+    for (final roach in roaches) {
+      roach.receiveTreat(
+        foodDish: foodDish,
+        waterDish: waterDish,
+        random: _random,
+      );
     }
   }
 
-  // Scatters water droplets equal to the population size plus a buffer
-  void dispenseWater() {
-    for (final w in waterPellets) {
-      w.removeFromParent();
-    }
-    waterPellets.clear();
-
-    final spawnCount = roaches.length + 4;
-    for (var i = 0; i < spawnCount; i++) {
-      final newWater = WaterPellet(position: _randomSpawnPosition());
-
-      waterPellets.add(newWater);
-      terrariumWorld.add(newWater);
-    }
-  }
-
-  // Picks a random coordinate inside the world, keeping clear of the edges
-  Vector2 _randomSpawnPosition() {
-    final rx =
-        boundaries.left + 200 + _random.nextDouble() * (boundaries.width - 400);
-    final ry =
-        boundaries.top + 200 + _random.nextDouble() * (boundaries.height - 400);
-    return Vector2(rx, ry);
+  // Scatters a gift object when a happy roach produces one
+  void spawnGift({required Vector2 position}) {
+    final gift = GiftItem(
+      position: position,
+      onCollect: (g) {
+        g.removeFromParent();
+        collectedGifts.value++;
+      },
+    );
+    terrariumWorld.add(gift);
   }
 
   // Simulation
@@ -330,31 +334,41 @@ class TerrariumGame extends FlameGame
       roach.update(
         scaledDt,
         boundaries: boundaries,
-        availableFoods: foods,
-        availableWater: waterPellets,
+        foodDish: foodDish,
+        waterDish: waterDish,
         availableHides: hides,
-        availableBranches: branches,
+        availableEnrichments: enrichments,
         otherRoaches: otherRoaches,
         isDayTime: isDayTime,
       );
     }
 
-    // Sweep the environment and remove fully consumed resources
-    foods.removeWhere((f) {
-      if (f.isDepleted) {
-        f.removeFromParent();
-        return true;
-      }
-      return false;
-    });
+    _giftCheckTimer -= scaledDt;
+    if (_giftCheckTimer <= 0) {
+      _giftCheckTimer = 60.0;
+      _evaluateGiftDrops();
+    }
+  }
 
-    waterPellets.removeWhere((w) {
-      if (w.isDepleted) {
-        w.removeFromParent();
-        return true;
+  // Evaluates all roaches to see if they produce a gift purely as a reward for observation
+  void _evaluateGiftDrops() {
+    for (final roach in roaches) {
+      // Roaches are more likely to leave a gift if their core needs are met
+      // and they are engaged in positive downtime (idle, hiding, playing, socializing)
+      bool isComfortable = roach.needs.hunger < 50 && roach.needs.thirst < 50;
+      bool isDowntime =
+          roach.currentActivity == Activity.idle ||
+          roach.currentActivity == Activity.hiding ||
+          roach.currentActivity == Activity.usingEnrichment ||
+          roach.currentActivity == Activity.interacting;
+
+      if (isComfortable && isDowntime) {
+        // Flat, gentle 10% chance per minute to drop a gift if they are chilling
+        if (_random.nextDouble() < 0.10) {
+          spawnGift(position: roach.position.clone());
+        }
       }
-      return false;
-    });
+    }
   }
 
   // Camera Input Handling
