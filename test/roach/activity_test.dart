@@ -12,6 +12,7 @@ void main() {
     expect(Activity.seekingEnrichment.isMoving, isTrue);
     expect(Activity.enteringHide.isMoving, isTrue);
     expect(Activity.exitingHide.isMoving, isTrue);
+    expect(Activity.excitedForTreat.isMoving, isTrue);
   });
 
   test('isMoving returns false for stationary activities', () {
@@ -28,5 +29,6 @@ void main() {
     expect(Activity.seekingSocial.label, 'Seeking Social Interaction');
     expect(Activity.interacting.label, 'Interacting with another roach');
     expect(Activity.idle.label, 'Idle');
+    expect(Activity.excitedForTreat.label, 'Excited for Treat');
   });
 }

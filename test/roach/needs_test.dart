@@ -2,14 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hissingo/roach/needs.dart';
 
 void main() {
-  test('Needs average is calculated correctly', () {
+  test('Needs initialize with correct default values', () {
     final needs = Needs();
-    needs.hunger = 20;
-    needs.thirst = 40;
-    needs.fatigue = 60;
-    needs.boredom = 80;
 
-    expect(needs.averageNeed, 50.0);
+    expect(needs.hunger, 0.0);
+    expect(needs.thirst, 0.0);
+    expect(needs.fatigue, 0.0);
+    expect(needs.boredom, 50.0);
   });
 
   test('Needs clamp correctly to maximum constraints', () {

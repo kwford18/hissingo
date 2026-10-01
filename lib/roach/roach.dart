@@ -4,10 +4,10 @@ import 'dart:ui';
 import 'package:flame/components.dart';
 
 import '../config/sim_config.dart';
-import '../environment/climbing_branch.dart';
-import '../environment/food.dart';
+import '../environment/enrichment.dart';
+import '../environment/food_dish.dart';
 import '../environment/hide.dart';
-import '../environment/water_pellet.dart';
+import '../environment/water_dish.dart';
 import 'activity.dart';
 import 'needs.dart';
 import 'personality.dart';
@@ -72,26 +72,41 @@ class Roach {
     }
   }
 
-  double get happiness => 100.0 - needs.averageNeed;
-
   // Prompts the roach to leave its current hide
-  // Does not lower happiness
   void coaxOut() {
     final h = targetHide;
-    if (isHidden && h is Hide) {
+    if (isHidden && h != null) {
       currentActivity = Activity.exitingHide;
       currentTarget = h.getEntrance();
       stateTimer = 10.0;
     }
   }
 
+  // Forces the roach to immediately stop what it is doing and run to a dish
+  void receiveTreat({
+    required FoodDish foodDish,
+    required WaterDish waterDish,
+    required Random random,
+  }) {
+    currentActivity = Activity.excitedForTreat;
+    isHidden = false;
+    targetHide = null;
+    stateTimer = 30.0;
+
+    if (random.nextBool()) {
+      currentTarget = foodDish;
+    } else {
+      currentTarget = waterDish;
+    }
+  }
+
   void update(
     double dt, {
     required Rect boundaries,
-    required List<Food> availableFoods,
-    required List<WaterPellet> availableWater,
+    required FoodDish foodDish,
+    required WaterDish waterDish,
     required List<Hide> availableHides,
-    required List<ClimbingBranch> availableBranches,
+    required List<EnrichmentObject> availableEnrichments,
     required List<Roach> otherRoaches,
     required bool isDayTime,
   }) {
@@ -99,11 +114,11 @@ class Roach {
       favoriteHide = availableHides[_random.nextInt(availableHides.length)];
     }
 
-    // Passively increase needs over time
-    needs.hunger += dt * 0.5 * personality.appetite;
-    needs.thirst += dt * 0.7 * personality.appetite;
-    needs.fatigue += dt * 0.2;
-    needs.boredom += dt * 0.4;
+    // Passively increase needs over time slowly to ensure high baseline comfort
+    needs.hunger += dt * 0.1 * personality.appetite;
+    needs.thirst += dt * 0.15 * personality.appetite;
+    needs.fatigue += dt * 0.1;
+    needs.boredom += dt * 0.2;
 
     if (needs.hunger > 100) needs.hunger = 100;
     if (needs.thirst > 100) needs.thirst = 100;
@@ -123,10 +138,10 @@ class Roach {
     if (stateTimer <= 0) {
       _decideNextActivity(
         boundaries: boundaries,
-        availableFoods: availableFoods,
-        availableWater: availableWater,
+        foodDish: foodDish,
+        waterDish: waterDish,
         availableHides: availableHides,
-        availableBranches: availableBranches,
+        availableEnrichments: availableEnrichments,
         otherRoaches: otherRoaches,
         isDayTime: isDayTime,
       );
@@ -135,7 +150,7 @@ class Roach {
     final target = currentTarget;
 
     // Verify the object is present in memory to safely permit movement
-    if (currentActivity.isMoving && target is Object) {
+    if (currentActivity.isMoving && target != null) {
       _moveTowardsTarget(dt);
     }
   }
@@ -144,22 +159,26 @@ class Roach {
     final target = currentTarget;
 
     if (currentActivity == Activity.eating) {
-      if (target is Food && target.isDepleted == false) {
-        needs.hunger -= dt * 30.0;
-        if (needs.hunger < 0) needs.hunger = 0;
-        if (stateTimer <= 0.1) {
-          target.isDepleted = true;
+      if (target is FoodDish) {
+        needs.hunger -= dt * 40.0;
+        if (needs.hunger <= 0) {
+          needs.hunger = 0;
+          currentActivity = Activity.idle;
+          currentTarget = null;
+          stateTimer = 2.0;
         }
       } else {
         currentActivity = Activity.idle;
         currentTarget = null;
       }
     } else if (currentActivity == Activity.drinking) {
-      if (target is WaterPellet && target.isDepleted == false) {
-        needs.thirst -= dt * 30.0;
-        if (needs.thirst < 0) needs.thirst = 0;
-        if (stateTimer <= 0.1) {
-          target.isDepleted = true;
+      if (target is WaterDish) {
+        needs.thirst -= dt * 40.0;
+        if (needs.thirst <= 0) {
+          needs.thirst = 0;
+          currentActivity = Activity.idle;
+          currentTarget = null;
+          stateTimer = 2.0;
         }
       } else {
         currentActivity = Activity.idle;
@@ -169,13 +188,21 @@ class Roach {
       needs.fatigue -= dt * 2.0;
       if (needs.fatigue < 0) needs.fatigue = 0;
     } else if (currentActivity == Activity.hiding) {
-      needs.fatigue -= dt * 4.0;
+      needs.fatigue -= dt * 10.0;
       if (needs.fatigue < 0) needs.fatigue = 0;
     } else if (currentActivity == Activity.usingEnrichment) {
-      needs.boredom -= dt * 8.0;
+      needs.boredom -= dt * 15.0;
       needs.fatigue += dt * 3.0;
-      if (needs.boredom < 0) needs.boredom = 0;
       if (needs.fatigue > 100) needs.fatigue = 100;
+
+      // Exit enrichment immediately when boredom is resolved
+      // to prevent unnecessary fatigue generation
+      if (needs.boredom <= 0) {
+        needs.boredom = 0;
+        currentActivity = Activity.idle;
+        currentTarget = null;
+        stateTimer = 0;
+      }
     } else if (currentActivity == Activity.interacting) {
       // The interaction outcome is processed immediately when they meet
       // so this state just holds them still while the emotion timer counts down
@@ -186,112 +213,175 @@ class Roach {
     }
   }
 
-  // Decides next activity based on needs, available resources, and personality traits
+  // Translates need tiers into probability weights to make decision making organic
+  double _getNeedWeight(double needValue) {
+    if (needValue > 90) return 500.0; // Must seek
+    if (needValue > 70) return 150.0; // Frequently seek
+    if (needValue > 40) return 50.0; // Occasionally seek
+    return 0.0; // Comfortable
+  }
+
+  // Decides next activity using a purely weighted probability system
   void _decideNextActivity({
     required Rect boundaries,
-    required List<Food> availableFoods,
-    required List<WaterPellet> availableWater,
+    required FoodDish foodDish,
+    required WaterDish waterDish,
     required List<Hide> availableHides,
-    required List<ClimbingBranch> availableBranches,
+    required List<EnrichmentObject> availableEnrichments,
     required List<Roach> otherRoaches,
     required bool isDayTime,
   }) {
     final h = targetHide;
 
-    if (isHidden && h is Hide) {
-      if (needs.fatigue < 10 || needs.hunger > 60 || needs.thirst > 60) {
-        currentActivity = Activity.exitingHide;
-        currentTarget = h.getEntrance();
-        stateTimer = 10.0;
+    if (isHidden && h != null) {
+      // Small chance to wake up and leave if fully rested and comfortable
+      if (needs.fatigue < 10 && needs.hunger < 50 && needs.thirst < 50) {
+        if (_random.nextDouble() < 0.2) {
+          currentActivity = Activity.exitingHide;
+          currentTarget = h.getEntrance();
+          stateTimer = 10.0;
+          return;
+        }
       }
+
+      currentActivity = Activity.hiding;
+      stateTimer = 10.0;
       return;
     }
 
     if (currentActivity == Activity.enteringHide ||
-        currentActivity == Activity.exitingHide) {
+        currentActivity == Activity.exitingHide ||
+        currentActivity == Activity.excitedForTreat) {
       return;
     }
 
-    if (needs.thirst > 40 && availableWater.isNotEmpty) {
-      final waterTarget = _findNearestWater(availableWater);
-      if (waterTarget is WaterPellet) {
-        currentActivity = Activity.seekingWater;
-        currentTarget = waterTarget;
-        stateTimer = 30.0;
-        return;
-      }
+    // Urgent needs force behavior to ensure survival routines are prioritized
+    if (needs.thirst > 40) {
+      currentActivity = Activity.seekingWater;
+      currentTarget = waterDish;
+      stateTimer = 30.0;
+      return;
     }
 
-    if (needs.hunger > 40 && availableFoods.isNotEmpty) {
-      final foodTarget = _findNearestFood(availableFoods);
-      if (foodTarget is Food) {
-        currentActivity = Activity.seekingFood;
-        currentTarget = foodTarget;
-        stateTimer = 30.0;
-        return;
-      }
+    if (needs.hunger > 40) {
+      currentActivity = Activity.seekingFood;
+      currentTarget = foodDish;
+      stateTimer = 30.0;
+      return;
     }
 
+    if (needs.fatigue > 60 && availableHides.isNotEmpty) {
+      currentActivity = Activity.seekingHide;
+      targetHide = _chooseHide(availableHides);
+      currentTarget = targetHide?.getEntrance();
+      stateTimer = 30.0;
+      return;
+    }
+
+    if (needs.boredom > 60 && availableEnrichments.isNotEmpty) {
+      currentActivity = Activity.seekingEnrichment;
+      final enrichment =
+          availableEnrichments[_random.nextInt(availableEnrichments.length)];
+      currentTarget = enrichment.getInteractionSpot(_random);
+      stateTimer = 30.0;
+      return;
+    }
+
+    // Base behavioral weights
+    double idleWeight = 40.0;
+    double hideWeight = availableHides.isNotEmpty
+        ? 25.0 * (1.0 + personality.skittishness)
+        : 0.0;
     double wanderWeight =
         15.0 * personality.activity * SimConfig.activityMultiplier;
-    double hideWeight = 25.0 * (1.0 + personality.skittishness);
-    double idleWeight = 40.0;
-    double enrichmentWeight = needs.boredom * 0.5 * personality.activity;
-    double socialWeight = 15.0 * personality.friendliness;
+    double socialWeight = otherRoaches.isNotEmpty
+        ? 10.0 * personality.friendliness
+        : 0.0;
 
-    // Time of day heavily influences the weights for more natural feeling behavior
-    // Roaches are more likely to hide during the day and wander at night
+    // Need-driven weights
+    double foodWeight = _getNeedWeight(needs.hunger);
+    double waterWeight = _getNeedWeight(needs.thirst);
+    double restWeight = availableHides.isNotEmpty
+        ? _getNeedWeight(needs.fatigue)
+        : 0.0;
+    double boredomWeight = availableEnrichments.isNotEmpty
+        ? _getNeedWeight(needs.boredom)
+        : 0.0;
+
+    // Time of day heavily influences the natural behaviors
     if (isDayTime) {
       hideWeight *= 2.5;
       idleWeight *= 1.5;
       wanderWeight *= 0.3;
-      enrichmentWeight *= 0.5;
       socialWeight *= 0.5;
     } else {
       wanderWeight *= 2.0;
       hideWeight *= 0.5;
-      enrichmentWeight *= 1.5;
       socialWeight *= 1.5;
     }
 
     double totalWeight =
-        wanderWeight +
-        hideWeight +
         idleWeight +
-        enrichmentWeight +
-        socialWeight;
+        hideWeight +
+        wanderWeight +
+        socialWeight +
+        foodWeight +
+        waterWeight +
+        restWeight +
+        boredomWeight;
 
     double roll = _random.nextDouble() * totalWeight;
 
-    if (roll < wanderWeight) {
-      currentActivity = Activity.wandering;
-      stateTimer = 5.0 + _random.nextDouble() * 5.0;
-
-      final targetX = boundaries.left + _random.nextDouble() * boundaries.width;
-      final targetY = boundaries.top + _random.nextDouble() * boundaries.height;
-      currentTarget = Vector2(targetX, targetY);
-    } else if (roll < wanderWeight + hideWeight && availableHides.isNotEmpty) {
+    // Weighted decision resolution
+    if (roll < foodWeight) {
+      currentActivity = Activity.seekingFood;
+      currentTarget = foodDish;
+      stateTimer = 30.0;
+    } else if (roll < foodWeight + waterWeight) {
+      currentActivity = Activity.seekingWater;
+      currentTarget = waterDish;
+      stateTimer = 30.0;
+    } else if (roll < foodWeight + waterWeight + restWeight) {
       currentActivity = Activity.seekingHide;
       targetHide = _chooseHide(availableHides);
-      final currentTargetHide = targetHide;
-      if (currentTargetHide is Hide) {
-        currentTarget = currentTargetHide.getEntrance();
-      }
+      currentTarget = targetHide?.getEntrance();
       stateTimer = 30.0;
-    } else if (roll < wanderWeight + hideWeight + enrichmentWeight &&
-        availableBranches.isNotEmpty) {
+    } else if (roll < foodWeight + waterWeight + restWeight + boredomWeight) {
       currentActivity = Activity.seekingEnrichment;
-      final branch =
-          availableBranches[_random.nextInt(availableBranches.length)];
-      currentTarget = branch.getRandomClimbSpot(_random);
+      final enrichment =
+          availableEnrichments[_random.nextInt(availableEnrichments.length)];
+      currentTarget = enrichment.getInteractionSpot(_random);
       stateTimer = 30.0;
     } else if (roll <
-            wanderWeight + hideWeight + enrichmentWeight + socialWeight &&
-        otherRoaches.isNotEmpty) {
+        foodWeight + waterWeight + restWeight + boredomWeight + socialWeight) {
       currentActivity = Activity.seekingSocial;
       targetRoach = otherRoaches[_random.nextInt(otherRoaches.length)];
       currentTarget = targetRoach;
       stateTimer = 30.0;
+    } else if (roll <
+        foodWeight +
+            waterWeight +
+            restWeight +
+            boredomWeight +
+            socialWeight +
+            hideWeight) {
+      currentActivity = Activity.seekingHide;
+      targetHide = _chooseHide(availableHides);
+      currentTarget = targetHide?.getEntrance();
+      stateTimer = 30.0;
+    } else if (roll <
+        foodWeight +
+            waterWeight +
+            restWeight +
+            boredomWeight +
+            socialWeight +
+            hideWeight +
+            wanderWeight) {
+      currentActivity = Activity.wandering;
+      stateTimer = 5.0 + _random.nextDouble() * 5.0;
+      final targetX = boundaries.left + _random.nextDouble() * boundaries.width;
+      final targetY = boundaries.top + _random.nextDouble() * boundaries.height;
+      currentTarget = Vector2(targetX, targetY);
     } else {
       currentActivity = Activity.idle;
       stateTimer = 2.0 + _random.nextDouble() * 4.0;
@@ -299,49 +389,7 @@ class Roach {
     }
   }
 
-  Food? _findNearestFood(List<Food> locations) {
-    final validFoods = locations.where((f) => f.isDepleted == false).toList();
-    if (validFoods.isEmpty) return null;
-
-    Food nearest = validFoods.first;
-    double minDistance = (nearest.position - position).length;
-
-    for (final loc in validFoods) {
-      final dist = (loc.position - position).length;
-      if (dist < minDistance) {
-        minDistance = dist;
-        nearest = loc;
-      }
-    }
-    return nearest;
-  }
-
-  WaterPellet? _findNearestWater(List<WaterPellet> locations) {
-    final validWater = locations.where((w) => w.isDepleted == false).toList();
-    if (validWater.isEmpty) return null;
-
-    WaterPellet nearest = validWater.first;
-    double minDistance = (nearest.position - position).length;
-
-    for (final loc in validWater) {
-      final dist = (loc.position - position).length;
-      if (dist < minDistance) {
-        minDistance = dist;
-        nearest = loc;
-      }
-    }
-    return nearest;
-  }
-
   Hide _chooseHide(List<Hide> locations) {
-    final fav = favoriteHide;
-    if (fav is Hide && locations.contains(fav)) {
-      // Roaches strongly prefer to return to their personal favorite hide
-      if (_random.nextDouble() < 0.8) {
-        return fav;
-      }
-    }
-
     Hide nearest = locations.first;
     double minDistance = (nearest.position - position).length;
 
@@ -363,9 +411,9 @@ class Roach {
     Vector2 targetPos;
     if (target is Vector2) {
       targetPos = target;
-    } else if (target is Food) {
+    } else if (target is FoodDish) {
       targetPos = target.position;
-    } else if (target is WaterPellet) {
+    } else if (target is WaterDish) {
       targetPos = target.position;
     } else if (target is Hide) {
       // Targets the center of the hide when seeking it
@@ -409,10 +457,21 @@ class Roach {
       } else if (currentActivity == Activity.seekingWater) {
         currentActivity = Activity.drinking;
         stateTimer = 4.0;
+      } else if (currentActivity == Activity.excitedForTreat) {
+        if (target is FoodDish) {
+          currentActivity = Activity.eating;
+          stateTimer = 4.0;
+        } else if (target is WaterDish) {
+          currentActivity = Activity.drinking;
+          stateTimer = 4.0;
+        } else {
+          currentActivity = Activity.idle;
+          currentTarget = null;
+        }
       } else if (currentActivity == Activity.seekingHide) {
         currentActivity = Activity.enteringHide;
         final h = targetHide;
-        if (h is Hide) {
+        if (h != null) {
           currentTarget = h.getRandomInterior(_random);
         }
         isHidden = true;
@@ -454,7 +513,8 @@ class Roach {
     }
 
     double currentSpeed = speed;
-    if (currentActivity == Activity.seekingSocial) {
+    if (currentActivity == Activity.seekingSocial ||
+        currentActivity == Activity.excitedForTreat) {
       currentSpeed *= SimConfig.socialSpeedMultiplier;
     }
 

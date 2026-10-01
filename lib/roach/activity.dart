@@ -12,7 +12,8 @@ enum Activity {
   seekingEnrichment,
   usingEnrichment,
   seekingSocial,
-  interacting;
+  interacting,
+  excitedForTreat;
 
   // Whether this activity has the roach travelling towards a target
   bool get isMoving =>
@@ -23,5 +24,6 @@ enum Activity {
       this == enteringHide ||
       this == exitingHide ||
       this == seekingEnrichment ||
-      this == seekingSocial;
+      this == seekingSocial ||
+      this == excitedForTreat;
 }
