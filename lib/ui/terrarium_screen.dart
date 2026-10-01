@@ -8,6 +8,7 @@ import 'inspector/hide_inspector.dart';
 import 'inspector/roach_inspector.dart';
 import 'resource_buttons.dart';
 import 'terrarium_drawer.dart';
+import 'terrarium_status_bar.dart';
 
 class TerrariumScreen extends StatefulWidget {
   const TerrariumScreen({super.key});
@@ -53,6 +54,8 @@ class _TerrariumScreenState extends State<TerrariumScreen> {
 
           // Resource dispensing buttons
           Positioned(top: 16, right: 16, child: ResourceButtons(game: game)),
+
+          TerrariumStatusBar(game: game),
 
           RoachInspector(game: game),
           HideInspector(game: game),

@@ -17,5 +17,6 @@ extension ActivityLabel on Activity {
     Activity.usingEnrichment => 'Using Enrichment',
     Activity.seekingSocial => 'Seeking Social Interaction',
     Activity.interacting => 'Interacting with another roach',
+    Activity.excitedForTreat => 'Excited for Treat',
   };
 }

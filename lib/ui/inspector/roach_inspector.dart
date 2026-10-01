@@ -73,8 +73,7 @@ class RoachInspector extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            // Display the 0-100 scale metrics for the active roach
-            NeedRow(label: 'Happiness', value: selected.happiness),
+            // Display the internal need states for the active roach
             NeedRow(label: 'Hunger', value: selected.needs.hunger),
             NeedRow(label: 'Thirst', value: selected.needs.thirst),
             NeedRow(label: 'Fatigue', value: selected.needs.fatigue),

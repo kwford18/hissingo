@@ -13,22 +13,12 @@ class ResourceButtons extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         ElevatedButton.icon(
-          onPressed: () => game.dispenseFood(),
-          icon: const Icon(Icons.restaurant),
-          label: const Text('Food'),
+          onPressed: () => game.dispenseTreat(),
+          icon: const Icon(Icons.favorite),
+          label: const Text('Treat'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF689F38),
+            backgroundColor: Colors.pinkAccent,
             foregroundColor: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 8),
-        ElevatedButton.icon(
-          onPressed: () => game.dispenseWater(),
-          icon: const Icon(Icons.water_drop),
-          label: const Text('Water'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF4FC3F7),
-            foregroundColor: Colors.black,
           ),
         ),
       ],

@@ -11,7 +11,7 @@ class LightingOverlay extends PositionComponent {
   final TerrariumGame game;
   late final Paint nightPaint;
 
-  LightingOverlay(this.game) {
+  LightingOverlay({required this.game}) {
     priority = 200;
     nightPaint = Paint()..color = const Color(0x00000000);
   }

@@ -2,15 +2,15 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hissingo/game/terrarium_game.dart';
+import 'package:hissingo/roach/activity.dart';
 import 'package:hissingo/ui/resource_buttons.dart';
 
 void main() {
-  testWidgets('ResourceButtons trigger game dispense methods', (
+  testWidgets('ResourceButtons trigger game treat method', (
     WidgetTester tester,
   ) async {
     final game = TerrariumGame();
 
-    // Mount the game so terrariumWorld is initialized
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -23,19 +23,14 @@ void main() {
         ),
       ),
     );
+
+    // Advance the test framework to allow Flame to run its internal load cycle
     await tester.pump();
 
-    final initialFoodCount = game.foods.length;
-    final initialWaterCount = game.waterPellets.length;
-
-    // Tap the food button
-    await tester.tap(find.text('Food'));
+    // Tap the treat button
+    await tester.tap(find.text('Treat'));
     await tester.pump();
-    expect(game.foods.length, greaterThan(initialFoodCount));
 
-    // Tap the water button
-    await tester.tap(find.text('Water'));
-    await tester.pump();
-    expect(game.waterPellets.length, greaterThan(initialWaterCount));
+    expect(game.roaches.first.currentActivity, Activity.excitedForTreat);
   });
 }
