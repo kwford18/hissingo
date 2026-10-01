@@ -13,7 +13,7 @@ class LightingOverlay extends PositionComponent {
 
   LightingOverlay({required this.game}) {
     priority = 200;
-    nightPaint = Paint()..color = const Color(0x00000000);
+    nightPaint = Paint()..color = const Color.fromARGB(0, 0, 0, 0);
   }
 
   @override

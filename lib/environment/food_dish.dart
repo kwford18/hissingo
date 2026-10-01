@@ -13,10 +13,10 @@ class FoodDish extends PositionComponent {
     priority = 15;
 
     dishPaint = Paint()
-      ..color = const Color(0xFF757575)
+      ..color = const Color.fromARGB(255, 117, 117, 117)
       ..style = PaintingStyle.fill;
 
-    foodPaint = Paint()..color = const Color(0xFF8BC34A);
+    foodPaint = Paint()..color = const Color.fromARGB(255, 139, 195, 74);
   }
 
   @override

@@ -12,7 +12,10 @@ class WarmSpot extends PositionComponent {
     priority = 10;
 
     final gradient = RadialGradient(
-      colors: [const Color(0x11FF5722), const Color(0x00FF5722)],
+      colors: [
+        const Color.fromARGB(17, 255, 87, 34),
+        const Color.fromARGB(0, 255, 87, 34),
+      ],
     );
 
     heatPaint = Paint()..shader = gradient.createShader(size.toRect());

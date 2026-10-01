@@ -19,9 +19,9 @@ class ClimbingBranch extends EnrichmentObject {
     this.size = size;
     priority = 20;
 
-    woodPaint = Paint()..color = const Color(0xFF6D4C41);
-    shadowPaint = Paint()..color = const Color(0x66000000);
-    leafPaint = Paint()..color = const Color(0xFF33691E);
+    woodPaint = Paint()..color = const Color.fromARGB(255, 109, 76, 65);
+    shadowPaint = Paint()..color = const Color.fromARGB(102, 0, 0, 0);
+    leafPaint = Paint()..color = const Color.fromARGB(255, 51, 105, 30);
   }
 
   @override
@@ -67,10 +67,10 @@ class SlotMachine extends EnrichmentObject {
     size = Vector2(100, 120);
     priority = 20;
 
-    bodyPaint = Paint()..color = const Color(0xFFD32F2F);
-    screenPaint = Paint()..color = const Color(0xFFE0E0E0);
+    bodyPaint = Paint()..color = const Color.fromARGB(255, 211, 47, 47);
+    screenPaint = Paint()..color = const Color.fromARGB(255, 224, 224, 224);
     handlePaint = Paint()
-      ..color = const Color(0xFF424242)
+      ..color = const Color.fromARGB(255, 66, 66, 66)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 6.0;
   }
@@ -86,7 +86,7 @@ class SlotMachine extends EnrichmentObject {
     canvas.drawRect(rect, bodyPaint);
     canvas.drawRect(Rect.fromLTWH(10, 20, 80, 50), screenPaint);
 
-    final slotPaint = Paint()..color = const Color(0xFF9E9E9E);
+    final slotPaint = Paint()..color = const Color.fromARGB(255, 158, 158, 158);
     canvas.drawRect(Rect.fromLTWH(20, 30, 15, 30), slotPaint);
     canvas.drawRect(Rect.fromLTWH(42, 30, 15, 30), slotPaint);
     canvas.drawRect(Rect.fromLTWH(64, 30, 15, 30), slotPaint);
@@ -99,7 +99,7 @@ class SlotMachine extends EnrichmentObject {
     canvas.drawCircle(
       Offset(size.x + 20, size.y / 4),
       10,
-      Paint()..color = const Color(0xFFB71C1C),
+      Paint()..color = const Color.fromARGB(255, 183, 28, 28),
     );
   }
 }
@@ -115,10 +115,10 @@ class WorkoutArea extends EnrichmentObject {
     priority = 20;
 
     barPaint = Paint()
-      ..color = const Color(0xFF9E9E9E)
+      ..color = const Color.fromARGB(255, 158, 158, 158)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 5.0;
-    weightPaint = Paint()..color = const Color(0xFF212121);
+    weightPaint = Paint()..color = const Color.fromARGB(255, 33, 33, 33);
   }
 
   @override
@@ -149,10 +149,10 @@ class Book extends EnrichmentObject {
     size = Vector2(100, 70);
     priority = 15;
 
-    coverPaint = Paint()..color = const Color(0xFF5D4037);
-    pagePaint = Paint()..color = const Color(0xFFFFF59D);
+    coverPaint = Paint()..color = const Color.fromARGB(255, 93, 64, 55);
+    pagePaint = Paint()..color = const Color.fromARGB(255, 255, 245, 157);
     textPaint = Paint()
-      ..color = const Color(0xFFBCAAA4)
+      ..color = const Color.fromARGB(255, 188, 170, 164)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
   }
@@ -187,8 +187,8 @@ class PirateSkull extends EnrichmentObject {
     size = Vector2(60, 60);
     priority = 18;
 
-    bonePaint = Paint()..color = const Color(0xFFF5F5F5);
-    hollowPaint = Paint()..color = const Color(0xFF212121);
+    bonePaint = Paint()..color = const Color.fromARGB(255, 245, 245, 245);
+    hollowPaint = Paint()..color = const Color.fromARGB(255, 33, 33, 33);
   }
 
   @override

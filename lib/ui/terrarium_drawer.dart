@@ -19,7 +19,7 @@ class TerrariumDrawer extends StatelessWidget {
       child: ListView(
         children: [
           const DrawerHeader(
-            decoration: BoxDecoration(color: Color(0xFF3E2723)),
+            decoration: BoxDecoration(color: Color.fromARGB(255, 62, 39, 35)),
             child: Text(
               'Terrarium Menu',
               style: TextStyle(fontSize: 24, color: Colors.white),

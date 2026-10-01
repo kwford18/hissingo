@@ -13,10 +13,10 @@ class WaterDish extends PositionComponent {
     priority = 15;
 
     dishPaint = Paint()
-      ..color = const Color(0xFF9E9E9E)
+      ..color = const Color.fromARGB(255, 158, 158, 158)
       ..style = PaintingStyle.fill;
 
-    waterPaint = Paint()..color = const Color(0xFF4FC3F7);
+    waterPaint = Paint()..color = const Color.fromARGB(255, 79, 195, 247);
   }
 
   @override

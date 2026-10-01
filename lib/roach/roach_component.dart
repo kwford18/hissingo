@@ -28,13 +28,13 @@ class RoachComponent extends PositionComponent with TapCallbacks {
 
     bodyPaint = Paint()..color = roach.bodyColor;
     outlinePaint = Paint()
-      ..color = const Color(0xFF3E2723)
+      ..color = const Color.fromARGB(255, 62, 39, 35)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5;
 
     // Thinner stroke width to make the legs less visually dominant
     legPaint = Paint()
-      ..color = const Color(0xFF3E2723)
+      ..color = const Color.fromARGB(255, 62, 39, 35)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0
       ..strokeCap = StrokeCap.round;

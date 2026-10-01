@@ -25,18 +25,18 @@ class Hide extends PositionComponent with TapCallbacks {
     this.size = size;
     priority = 50;
 
-    shadowPaint = Paint()..color = const Color(0xAA000000);
+    shadowPaint = Paint()..color = const Color.fromARGB(170, 0, 0, 0);
     linePaint = Paint()
-      ..color = const Color(0xFF3E2723)
+      ..color = const Color.fromARGB(255, 62, 39, 35)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.0;
 
     if (shape == HideShape.stone) {
-      basePaint = Paint()..color = const Color(0xFF546E7A);
+      basePaint = Paint()..color = const Color.fromARGB(255, 84, 110, 122);
     } else if (shape == HideShape.leaf) {
-      basePaint = Paint()..color = const Color(0xFF558B2F);
+      basePaint = Paint()..color = const Color.fromARGB(255, 85, 139, 47);
     } else {
-      basePaint = Paint()..color = const Color(0xFF4E342E);
+      basePaint = Paint()..color = const Color.fromARGB(255, 78, 52, 46);
     }
   }
 

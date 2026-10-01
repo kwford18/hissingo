@@ -15,9 +15,10 @@ class Substrate extends PositionComponent {
     size = Vector2(width, height);
     priority = 0;
 
-    bgPaint = Paint()..color = const Color(0xFF5D4037);
+    // bgPaint = Paint()..color = const Color(0xFF5D4037);
+    bgPaint = Paint()..color = const Color.fromARGB(255, 93, 64, 55);
     borderPaint = Paint()
-      ..color = const Color(0xFF27150C)
+      ..color = const Color.fromARGB(255, 39, 21, 12)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 20;
   }

@@ -14,9 +14,9 @@ class GiftItem extends PositionComponent with TapCallbacks {
     anchor = Anchor.center;
     priority = 30;
 
-    boxPaint = Paint()..color = const Color(0xFFFBC02D);
+    boxPaint = Paint()..color = const Color.fromARGB(255, 255, 188, 45);
     ribbonPaint = Paint()
-      ..color = const Color(0xFFD32F2F)
+      ..color = const Color.fromARGB(255, 211, 47, 47)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3.0;
   }
