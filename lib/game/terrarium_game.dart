@@ -5,6 +5,8 @@ import 'package:flame/game.dart';
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flame/experimental.dart';
+import 'package:flame/particles.dart';
+import 'package:flame_audio/flame_audio.dart';
 import 'package:flutter/material.dart';
 
 import '../config/sim_config.dart';
@@ -63,6 +65,13 @@ class TerrariumGame extends FlameGame with ScaleDetector, ScrollDetector {
 
   StorageService? storageService;
 
+  final List<String> _hissSounds = [
+    'roach1.mp3',
+    'roach2.mp3',
+    'roach3.mp3',
+    'roach4.mp3',
+  ];
+
   TerrariumGame({this.storageService});
 
   // Methods
@@ -70,6 +79,9 @@ class TerrariumGame extends FlameGame with ScaleDetector, ScrollDetector {
   Future<void> onLoad() async {
     terrariumWorld = World();
     add(terrariumWorld);
+
+    // Pre-cache audio to prevent lag on first playback
+    await FlameAudio.audioCache.loadAll(_hissSounds);
 
     boundaries = Rect.fromLTWH(0, 0, worldWidth, worldHeight);
     terrariumWorld.add(Substrate(width: worldWidth, height: worldHeight));
@@ -101,11 +113,21 @@ class TerrariumGame extends FlameGame with ScaleDetector, ScrollDetector {
   void _selectRoach(Roach roach) {
     selectedRoach.value = roach;
     selectedHide.value = null;
+
+    // ~20% chance to hiss when the user taps on the roach
+    if (_random.nextDouble() < 0.20) {
+      _playRandomHiss();
+    }
   }
 
   void _selectHide(Hide hide) {
     selectedHide.value = hide;
     selectedRoach.value = null;
+  }
+
+  void _playRandomHiss() {
+    final sound = _hissSounds[_random.nextInt(_hissSounds.length)];
+    FlameAudio.play(sound, volume: 0.5);
   }
 
   void _spawnEnvironment() {
@@ -269,6 +291,8 @@ class TerrariumGame extends FlameGame with ScaleDetector, ScrollDetector {
 
   // Adds a roach to the domain layer and the game world
   void _addRoach(Roach roach) {
+    roach.onHiss = _playRandomHiss;
+
     roaches.add(roach);
     terrariumWorld.add(RoachComponent(roach, onSelect: _selectRoach));
   }
@@ -292,7 +316,6 @@ class TerrariumGame extends FlameGame with ScaleDetector, ScrollDetector {
   // Renames a roach and refreshes the inspection panel to show the new name
   void renameRoach(Roach roach, String name) {
     roach.name = name;
-
     // Force a rebuild of the inspection panel by resetting the listener
     final current = selectedRoach.value;
     selectedRoach.value = null;
@@ -302,7 +325,6 @@ class TerrariumGame extends FlameGame with ScaleDetector, ScrollDetector {
   // Coaxes a roach out of its hide and refreshes the hide inspection panel
   void coaxRoachOut(Roach roach) {
     roach.coaxOut();
-
     // Force UI refresh to update the occupant count
     final currentHide = selectedHide.value;
     selectedHide.value = null;
@@ -318,6 +340,11 @@ class TerrariumGame extends FlameGame with ScaleDetector, ScrollDetector {
         random: _random,
       );
     }
+
+    _spawnParticleBurst(
+      Vector2(worldWidth / 2, worldHeight / 2),
+      const Color.fromARGB(255, 255, 64, 129),
+    );
   }
 
   // Scatters a gift object when a happy roach produces one
@@ -330,6 +357,34 @@ class TerrariumGame extends FlameGame with ScaleDetector, ScrollDetector {
       },
     );
     terrariumWorld.add(gift);
+
+    _spawnParticleBurst(position, const Color.fromARGB(255, 255, 193, 7));
+  }
+
+  // Generates particle burst
+  void _spawnParticleBurst(Vector2 position, Color color) {
+    final particleComponent = ParticleSystemComponent(
+      position: position,
+      particle: Particle.generate(
+        count: 20,
+        lifespan: 1.0,
+        generator: (i) {
+          return AcceleratedParticle(
+            acceleration: Vector2(
+              _random.nextDouble() * 200 - 100,
+              _random.nextDouble() * 200 - 100,
+            ),
+            speed: Vector2(
+              _random.nextDouble() * 100 - 50,
+              _random.nextDouble() * 100 - 50,
+            ),
+            position: Vector2.zero(),
+            child: CircleParticle(radius: 3.0, paint: Paint()..color = color),
+          );
+        },
+      ),
+    );
+    terrariumWorld.add(particleComponent);
   }
 
   // Captures the current terrarium state and commits it to device storage
@@ -417,6 +472,7 @@ class TerrariumGame extends FlameGame with ScaleDetector, ScrollDetector {
   @override
   void update(double dt) {
     super.update(dt);
+
     final scaledDt = dt * SimConfig.timeScale;
 
     dayCycleTimer += scaledDt;
@@ -427,7 +483,6 @@ class TerrariumGame extends FlameGame with ScaleDetector, ScrollDetector {
     for (final roach in roaches) {
       // Create a list of all other roaches to pass to the interaction logic
       final otherRoaches = roaches.where((r) => r != roach).toList();
-
       roach.update(
         scaledDt,
         boundaries: boundaries,

@@ -40,6 +40,9 @@ class Roach {
   late final Color bodyColor;
   late final double scaleModifier;
 
+  // Callback triggered during negative social interactions
+  void Function()? onHiss;
+
   Roach({
     required this.id,
     required this.name,
@@ -490,6 +493,7 @@ class Roach {
       Roach r => r.position,
       _ => null,
     };
+
     if (targetPos == null) return;
 
     final direction = targetPos - position;
@@ -598,9 +602,11 @@ class Roach {
       if (needs.boredom < 0) needs.boredom = 0;
     } else {
       currentEmotion = 'Hiss.';
+      onHiss?.call();
       needs.fatigue += 15;
       if (needs.fatigue > 100) needs.fatigue = 100;
     }
+
     emotionTimer = 3.0;
     currentTarget = null;
     targetRoach = null;
