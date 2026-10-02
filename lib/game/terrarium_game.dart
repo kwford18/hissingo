@@ -107,6 +107,20 @@ class TerrariumGame extends FlameGame with ScaleDetector, ScrollDetector {
     cam.viewfinder.zoom = 1.0;
     cam.viewfinder.position = Vector2(worldWidth / 2, worldHeight / 2);
     add(cam);
+
+    // TODO: REMOVE
+    // This is just for testing and debugging
+    final fpsComponent = FpsTextComponent(
+      position: Vector2(worldWidth / 2 - 50, 40),
+      textRenderer: TextPaint(
+        style: const TextStyle(
+          color: Colors.greenAccent,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+    cam.viewport.add(fpsComponent);
   }
 
   // Selection callbacks shared by every tappable component in the world
