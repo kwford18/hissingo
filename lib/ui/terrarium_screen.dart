@@ -2,6 +2,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
 import '../game/terrarium_game.dart';
+import 'dialogs/offline_summary_dialog.dart';
 import 'dialogs/roach_dialogs.dart';
 import 'dialogs/terrarium_dialogs.dart';
 import 'inspector/hide_inspector.dart';
@@ -17,13 +18,48 @@ class TerrariumScreen extends StatefulWidget {
   State<TerrariumScreen> createState() => _TerrariumScreenState();
 }
 
-class _TerrariumScreenState extends State<TerrariumScreen> {
+// Listen to app lifecycle events
+class _TerrariumScreenState extends State<TerrariumScreen>
+    with WidgetsBindingObserver {
   late final TerrariumGame game;
 
   @override
   void initState() {
     super.initState();
     game = TerrariumGame();
+    // Register the observer when the screen is created
+    WidgetsBinding.instance.addObserver(this);
+
+    // Listen for the game to complete its offline calculation
+    game.offlineSummary.addListener(_onOfflineSummary);
+  }
+
+  void _onOfflineSummary() {
+    final summary = game.offlineSummary.value;
+    if (summary != null && mounted) {
+      showOfflineSummaryDialog(context, summary);
+      // Clear value to prevent retriggering
+      game.offlineSummary.value = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    game.offlineSummary.removeListener(_onOfflineSummary);
+    // Unregister the observer to prevent memory leaks if the screen is destroyed
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Automatically save the terrarium state whenever the app is minimized,
+    // tabbed away, or hidden
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      game.saveTerrarium();
+    }
   }
 
   @override

@@ -20,6 +20,7 @@ import '../roach/roach.dart';
 import '../roach/roach_component.dart';
 import '../services/storage_service.dart';
 import 'lighting_overlay.dart';
+import 'offline_summary.dart';
 import 'substrate.dart';
 import 'terrarium_save_state.dart';
 
@@ -45,6 +46,7 @@ class TerrariumGame extends FlameGame
   final ValueNotifier<Roach?> selectedRoach = ValueNotifier(null);
   final ValueNotifier<Hide?> selectedHide = ValueNotifier(null);
   final ValueNotifier<int> collectedGifts = ValueNotifier(0);
+  final ValueNotifier<OfflineSummary?> offlineSummary = ValueNotifier(null);
 
   final List<Roach> roaches = [];
   final List<Hide> hides = [];
@@ -80,7 +82,7 @@ class TerrariumGame extends FlameGame
     final savedState = storageService?.loadState();
 
     if (savedState != null) {
-      _restoreState(savedState);
+      restoreState(savedState);
     } else {
       createDefaultTerrarium();
     }
@@ -345,12 +347,13 @@ class TerrariumGame extends FlameGame
   void loadTerrarium() {
     final state = storageService?.loadState();
     if (state != null) {
-      _restoreState(state);
+      restoreState(state);
     }
   }
 
   // Wipes active simulation entities before reconstructing from saved state
-  void _restoreState(TerrariumSaveState state) {
+  // and processes offline progression.
+  void restoreState(TerrariumSaveState state) {
     roaches.clear();
     final oldRoaches = terrariumWorld.children
         .whereType<RoachComponent>()
@@ -366,6 +369,48 @@ class TerrariumGame extends FlameGame
 
     for (final r in state.roaches) {
       _addRoach(r);
+    }
+
+    // Offline catch up calculation
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final elapsedMs = now - state.lastSavedTimestamp;
+
+    // Only trigger if away for more than 1 minute to avoid spamming the dialog
+    if (elapsedMs > 60000) {
+      final elapsedSeconds = elapsedMs / 1000.0;
+      int giftsFound = 0;
+
+      for (final r in roaches) {
+        // Passive need generation using simplified offline math
+        r.needs.hunger =
+            (r.needs.hunger + (elapsedSeconds * 0.02 * r.personality.appetite))
+                .clamp(0.0, 100.0);
+        r.needs.thirst =
+            (r.needs.thirst + (elapsedSeconds * 0.03 * r.personality.appetite))
+                .clamp(0.0, 100.0);
+        r.needs.boredom = (r.needs.boredom + (elapsedSeconds * 0.05)).clamp(
+          0.0,
+          100.0,
+        );
+        r.needs.fatigue = 0; // They rested while unattended
+
+        // Roaches only produce gifts if their needs were relatively met when they went to sleep
+        bool isComfortable = r.needs.hunger < 50 && r.needs.thirst < 50;
+        if (isComfortable) {
+          final minutesOffline = elapsedSeconds / 60.0;
+          final chance = (minutesOffline * 0.05).clamp(0.0, 1.0);
+          if (_random.nextDouble() < chance) {
+            giftsFound++;
+          }
+        }
+      }
+
+      collectedGifts.value += giftsFound;
+
+      offlineSummary.value = OfflineSummary(
+        timeAway: Duration(milliseconds: elapsedMs),
+        giftsFound: giftsFound,
+      );
     }
   }
 

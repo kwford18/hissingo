@@ -3,8 +3,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hissingo/environment/gift_item.dart';
 import 'package:hissingo/game/terrarium_game.dart';
 import 'package:hissingo/roach/activity.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  // Runs once before all tests to prep the environment
+  setUp(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+  });
+
   test('TerrariumGame initializes with default roaches', () async {
     final game = TerrariumGame();
     // Awaiting onLoad directly ensures the test environment safely mounts components
