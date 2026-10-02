@@ -60,9 +60,9 @@ class Roach {
       bodyColor = color;
     } else {
       // Generates a persistent subtle color shift from the base hisser brown
-      final rOff = _random.nextInt(40) - 20;
-      final gOff = _random.nextInt(30) - 15;
-      final bOff = _random.nextInt(30) - 15;
+      final rOff = _random.nextInt(81) - 40;
+      final gOff = _random.nextInt(61) - 30;
+      final bOff = _random.nextInt(61) - 30;
 
       final r = (141 + rOff).clamp(0, 255);
       final g = (110 + gOff).clamp(0, 255);
