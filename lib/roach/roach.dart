@@ -72,6 +72,47 @@ class Roach {
     }
   }
 
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'position': {'x': position.x, 'y': position.y},
+    'orientation': orientation,
+    'personality': personality.toJson(),
+    'needs': needs.toJson(),
+    'bodyColor': bodyColor.toARGB32(),
+    'scaleModifier': scaleModifier,
+  };
+
+  factory Roach.fromJson(Map<String, dynamic> json) {
+    final pos = json['position'] as Map<String, dynamic>? ?? {};
+    final roach = Roach(
+      id:
+          json['id'] as String? ??
+          'roach_${DateTime.now().millisecondsSinceEpoch}',
+      name: json['name'] as String? ?? 'Unknown',
+      position: Vector2(
+        (pos['x'] as num?)?.toDouble() ?? 1000.0,
+        (pos['y'] as num?)?.toDouble() ?? 1000.0,
+      ),
+      orientation: (json['orientation'] as num?)?.toDouble() ?? 0.0,
+      personality: json['personality'] != null
+          ? Personality.fromJson(json['personality'] as Map<String, dynamic>)
+          : const Personality(),
+      color: json['bodyColor'] != null ? Color(json['bodyColor'] as int) : null,
+      scale: (json['scaleModifier'] as num?)?.toDouble(),
+    );
+
+    if (json['needs'] != null) {
+      final savedNeeds = Needs.fromJson(json['needs'] as Map<String, dynamic>);
+      roach.needs.hunger = savedNeeds.hunger;
+      roach.needs.thirst = savedNeeds.thirst;
+      roach.needs.fatigue = savedNeeds.fatigue;
+      roach.needs.boredom = savedNeeds.boredom;
+    }
+
+    return roach;
+  }
+
   // Prompts the roach to leave its current hide
   void coaxOut() {
     final h = targetHide;
@@ -267,7 +308,7 @@ class Roach {
         // to prevent unnecessary fatigue generation
         if (needs.boredom <= 0) {
           needs.boredom = 0;
-          _endActivity(timer: 0);
+          _endActivity(timer: 2.0);
         }
 
       case Activity.interacting:
