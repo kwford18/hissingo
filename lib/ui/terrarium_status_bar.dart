@@ -20,7 +20,7 @@ class TerrariumStatusBar extends StatelessWidget {
               vertical: 8.0,
             ),
             decoration: BoxDecoration(
-              color: const Color(0xDD000000),
+              color: const Color.fromARGB(221, 0, 0, 0),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: Colors.white24),
             ),
@@ -30,7 +30,7 @@ class TerrariumStatusBar extends StatelessWidget {
                 const Icon(
                   Icons.card_giftcard,
                   size: 16,
-                  color: Color(0xFFFBC02D),
+                  color: const Color.fromARGB(255, 251, 192, 45),
                 ),
                 const SizedBox(width: 6),
                 ValueListenableBuilder<int>(

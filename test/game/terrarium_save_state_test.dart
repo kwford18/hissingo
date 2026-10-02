@@ -11,7 +11,7 @@ void main() {
       id: 'test_id',
       name: 'Test Roach',
       position: Vector2(100, 200),
-      color: const Color(0xFF8D6E63),
+      color: const Color.fromARGB(255, 141, 110, 99),
       scale: 0.95,
     );
     roach.needs.hunger = 45.0;
@@ -33,7 +33,7 @@ void main() {
     expect(loadedRoach.id, 'test_id');
     expect(loadedRoach.name, 'Test Roach');
     expect(loadedRoach.position.x, 100.0);
-    expect(loadedRoach.bodyColor.value, 0xFF8D6E63);
+    expect(loadedRoach.bodyColor.toARGB32(), 0xFF8D6E63);
     expect(loadedRoach.scaleModifier, 0.95);
     expect(loadedRoach.needs.hunger, 45.0);
   });
