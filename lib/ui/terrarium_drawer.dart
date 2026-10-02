@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 class TerrariumDrawer extends StatelessWidget {
   final VoidCallback onCreateDefaultTerrarium;
   final VoidCallback onAdoptRoach;
+  final VoidCallback onSaveTerrarium;
+  final VoidCallback onLoadTerrarium;
 
   const TerrariumDrawer({
     super.key,
     required this.onCreateDefaultTerrarium,
     required this.onAdoptRoach,
+    required this.onSaveTerrarium,
+    required this.onLoadTerrarium,
   });
 
   // The drawer closes itself before running an action, so the actions are
@@ -39,6 +43,22 @@ class TerrariumDrawer extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               onAdoptRoach();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.save),
+            title: const Text('Save Terrarium'),
+            onTap: () {
+              Navigator.pop(context);
+              onSaveTerrarium();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.download),
+            title: const Text('Load Terrarium'),
+            onTap: () {
+              Navigator.pop(context);
+              onLoadTerrarium();
             },
           ),
         ],

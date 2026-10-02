@@ -24,8 +24,8 @@ class StorageService {
     return _prefs.setString(_saveKey, jsonStr);
   }
 
-  /// Loads and deserializes the state from local storage.
-  /// Returns null if no save data exists or if decoding fails.
+  // Loads and deserializes the state from local storage.
+  // Returns null if no save data exists or if decoding fails.
   TerrariumSaveState? loadState() {
     final jsonStr = _prefs.getString(_saveKey);
     if (jsonStr == null) return null;

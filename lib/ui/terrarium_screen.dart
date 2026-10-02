@@ -33,6 +33,17 @@ class _TerrariumScreenState extends State<TerrariumScreen> {
         onCreateDefaultTerrarium: () =>
             showResetTerrariumDialog(context, game: game),
         onAdoptRoach: () => showAdoptRoachDialog(context, game: game),
+        onSaveTerrarium: () {
+          game.saveTerrarium();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Terrarium saved locally!')),
+          );
+        },
+        onLoadTerrarium: () {
+          game.loadTerrarium();
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Terrarium loaded!')));
+        },
       ),
       // Bridges Flutter UI and Flame
       body: Stack(

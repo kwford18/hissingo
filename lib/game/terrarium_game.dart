@@ -18,8 +18,10 @@ import '../roach/activity.dart';
 import '../roach/personality.dart';
 import '../roach/roach.dart';
 import '../roach/roach_component.dart';
+import '../services/storage_service.dart';
 import 'lighting_overlay.dart';
 import 'substrate.dart';
+import 'terrarium_save_state.dart';
 
 // Main game class for the terrarium simulation
 class TerrariumGame extends FlameGame
@@ -58,6 +60,10 @@ class TerrariumGame extends FlameGame
 
   double _giftCheckTimer = 60.0;
 
+  StorageService? storageService;
+
+  TerrariumGame({this.storageService});
+
   // Methods
   @override
   Future<void> onLoad() async {
@@ -68,7 +74,16 @@ class TerrariumGame extends FlameGame
     terrariumWorld.add(Substrate(width: worldWidth, height: worldHeight));
 
     _spawnEnvironment();
-    createDefaultTerrarium();
+
+    // Check device persistence before falling back to default colony
+    storageService ??= await StorageService.init();
+    final savedState = storageService?.loadState();
+
+    if (savedState != null) {
+      _restoreState(savedState);
+    } else {
+      createDefaultTerrarium();
+    }
 
     terrariumWorld.add(LightingOverlay(game: this));
 
@@ -316,6 +331,44 @@ class TerrariumGame extends FlameGame
     terrariumWorld.add(gift);
   }
 
+  // Captures the current terrarium state and commits it to device storage
+  void saveTerrarium() {
+    final state = TerrariumSaveState(
+      roaches: roaches,
+      collectedGifts: collectedGifts.value,
+      lastSavedTimestamp: DateTime.now().millisecondsSinceEpoch,
+    );
+    storageService?.saveState(state);
+  }
+
+  // Restores the last captured state from storage
+  void loadTerrarium() {
+    final state = storageService?.loadState();
+    if (state != null) {
+      _restoreState(state);
+    }
+  }
+
+  // Wipes active simulation entities before reconstructing from saved state
+  void _restoreState(TerrariumSaveState state) {
+    roaches.clear();
+    final oldRoaches = terrariumWorld.children
+        .whereType<RoachComponent>()
+        .toList();
+    for (final c in oldRoaches) {
+      c.removeFromParent();
+    }
+
+    selectedRoach.value = null;
+    selectedHide.value = null;
+
+    collectedGifts.value = state.collectedGifts;
+
+    for (final r in state.roaches) {
+      _addRoach(r);
+    }
+  }
+
   // Simulation
   @override
   void update(double dt) {
@@ -350,7 +403,7 @@ class TerrariumGame extends FlameGame
     }
   }
 
-  // Evaluates all roaches to see if they produce a gift purely as a reward for observation
+  // Evaluates all roaches to see if they produce a gift
   void _evaluateGiftDrops() {
     for (final roach in roaches) {
       // Roaches are more likely to leave a gift if their core needs are met
