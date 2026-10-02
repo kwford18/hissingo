@@ -43958,7 +43958,7 @@ r=this.a.P
 r===$&&A.a()
 r=r.ay
 q=r.ax.f
-s=B.c.cv(q.a[0]+s*-0.001,0.5,3)
+s=B.c.cv(q.a[0]+s*-0.001,0.15,3)
 p=new A.a1(new Float32Array(2))
 p.vZ(s)
 q.bM(p)
@@ -44024,7 +44024,7 @@ s=new A.yk(new A.e(a.e,a.f)).gBw().a[0]
 r=this.P
 r===$&&A.a()
 r=r.ay
-s=B.c.cv(p*s,0.5,3)
+s=B.c.cv(p*s,0.15,3)
 p=r.ax
 q=new A.a1(new Float32Array(2))
 q.vZ(s)
