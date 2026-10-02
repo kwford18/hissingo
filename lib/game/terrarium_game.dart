@@ -25,8 +25,7 @@ import 'substrate.dart';
 import 'terrarium_save_state.dart';
 
 // Main game class for the terrarium simulation
-class TerrariumGame extends FlameGame
-    with PanDetector, ScaleDetector, ScrollDetector {
+class TerrariumGame extends FlameGame with ScaleDetector, ScrollDetector {
   // World Configuration
   final double worldWidth = 2000;
   final double worldHeight = 2000;
@@ -471,19 +470,18 @@ class TerrariumGame extends FlameGame
 
   // Camera Input Handling
   @override
-  void onPanUpdate(DragUpdateInfo info) {
-    cam.viewfinder.position -= info.delta.global / cam.viewfinder.zoom;
-  }
-
-  @override
   void onScaleStart(ScaleStartInfo info) {
     startZoom = cam.viewfinder.zoom;
   }
 
   @override
   void onScaleUpdate(ScaleUpdateInfo info) {
+    // Handle two-finger zooming
     final currentZoom = startZoom * info.scale.global.x;
     cam.viewfinder.zoom = currentZoom.clamp(minZoom, maxZoom);
+
+    // Handle single-finger panning via the scale focal point delta
+    cam.viewfinder.position -= info.delta.global / cam.viewfinder.zoom;
   }
 
   @override
