@@ -20,7 +20,7 @@ class InspectorPanel extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         width: 320,
         decoration: BoxDecoration(
-          color: const Color(0xDD000000),
+          color: const Color.fromARGB(221, 0, 0, 0),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.white24),
         ),
