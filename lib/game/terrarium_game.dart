@@ -35,7 +35,7 @@ class TerrariumGame extends FlameGame with ScaleDetector, ScrollDetector {
   late final Rect boundaries;
 
   // Camera Configuration
-  final double minZoom = 0.5;
+  final double minZoom = 0.15;
   final double maxZoom = 3.0;
 
   late double startZoom;
