@@ -1,7 +1,7 @@
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
-// Represents a warm spot in the terrarium using a radial gradient
+// Represents a warm spot in the terrarium using an optimized low-opacity fill
 class WarmSpot extends PositionComponent {
   late final Paint heatPaint;
 
@@ -11,18 +11,13 @@ class WarmSpot extends PositionComponent {
     anchor = Anchor.center;
     priority = 10;
 
-    final gradient = RadialGradient(
-      colors: [
-        const Color.fromARGB(17, 255, 87, 34),
-        const Color.fromARGB(0, 255, 87, 34),
-      ],
-    );
-
-    heatPaint = Paint()..shader = gradient.createShader(size.toRect());
+    heatPaint = Paint()
+      ..color = const Color.fromARGB(14, 255, 87, 34)
+      ..style = PaintingStyle.fill;
   }
 
   @override
   void render(Canvas canvas) {
-    canvas.drawRect(size.toRect(), heatPaint);
+    canvas.drawCircle(Offset(size.x / 2, size.y / 2), size.x / 2, heatPaint);
   }
 }

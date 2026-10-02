@@ -29,6 +29,9 @@ class LightingOverlay extends PositionComponent {
 
   @override
   void render(Canvas canvas) {
-    canvas.drawRect(game.boundaries, nightPaint);
+    // Only dispatch the massive world-sized draw call if the night tint is actually visible
+    if (nightPaint.color.a > 0) {
+      canvas.drawRect(game.boundaries, nightPaint);
+    }
   }
 }
