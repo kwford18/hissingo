@@ -3,7 +3,7 @@
     "short_name": "hissingo",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#000000",
+    "background_color": "#3E2723",
     "theme_color": "#3E2723",
     "description": "A simple hissing cockroach pet simulator. Watch them move around, hide, and interact!",
     "orientation": "portrait-primary",
