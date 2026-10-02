@@ -1,11 +1,11 @@
 {
-    "name": "hissingo",
+    "name": "Hissingo Idle Roach Terrarium",
     "short_name": "hissingo",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#000000",
+    "theme_color": "#3E2723",
+    "description": "A simple hissing cockroach pet simulator. Watch them move around, hide, and interact!",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
